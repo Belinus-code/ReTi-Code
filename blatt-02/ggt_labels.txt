@@ -1,0 +1,301 @@
+# This Code uses a self-developed stack and call-Method
+# Call-Method takes care of jumping to method, returning from method,
+# Saving Arguments and Return Values, and storing M(0)-M(4) + IN1 to Stack
+
+# On every Method-Call, Stack looks like this:
+# M(IN2): <empty>
+# M(IN2 - 1): return-Adress to Method call
+# M(IN2 - 2): amount of Arguments 0...n
+# M(IN2 - 3): IN1 Register
+# M(IN2 - 4) - M(IN2 - 8): Copy of M(0) - M(4)
+# M(IN2 - 9) - M(IN2 - (9+n)): Arugments if n > 0
+
+# Calling a Method:
+# 0. Store all Important Values in M(0) - M(4) and IN1
+# 1. Store max(arg_count, ret_val_count) to M(1026)
+# 2. Store all Arguments to M(1030), M(1031), ...
+# 3. Store relative Distance to Method in M(1024)
+# 4. Store PC at M(1025)
+# 5. JUMP to CALL-Method
+# 6. Load Return Values from M(1030), ...
+
+# Also i wrote this code using labels instead of counting jump-Distances myself.
+# Labels were then replaced using my tool https://github.com/Belinus-code/ReTi-Label-Parser
+
+# Prepare Stack
+LOADI 2048          # Stack beginns at 2048
+MOVE acc in2        # IN2 is always Stackpointer
+
+# Fill M(0) to M(4) and IN1 with data (Otherwise Python error)
+LOADI 0
+STORE 0
+STORE 1
+STORE 2
+STORE 3
+STORE 4
+MOVE acc in1
+
+LOADI 4
+STORE 40
+LOADI 2
+STORE 41
+
+LOADI 2
+STORE 1026          # Store '2' to M(1026) -> Argument Count
+LOAD 40             # <----- ARGUMENT x
+STORE 1030          # Store '6' to M(1030) -> x
+LOAD 41             # <----- ARGUMENT y
+STORE 1031          # Store '7' to M(1031) -> y
+LOADI *GGT          # Relative Distance to GGT Method
+STORE 1024          # Store Distance to GTT Method in M(1024)
+MOVE pc acc
+STORE 1025          # Store PC in M(1025) -> To calc Return and Method adress
+JUMP CALL           # Call 'Call-Method'
+
+LOAD 1030           # Return Value is in same Place as first Arumgent
+STORE 42
+PRINT 42
+
+end:
+JUMP end
+
+###### GGT METHOD ######
+GGT:
+LOAD 0
+MOVE acc in1            # Pointer to x
+LOADIN 1 1              # Load y
+JUMPC = CALL_RETURN     # if y=0 Return x. x is already at returnValue Adress
+
+# y != 0, so use recursive Formula
+# First, call max(x,y):
+LOADI 2
+STORE 1026          # Store '2' to M(1026) -> Argument Count
+LOADIN 1 0          # <----- ARGUMENT x
+STORE 1030          # Store '6' to M(1030) -> x
+LOADIN 1 1          # <----- ARGUMENT y
+STORE 1031          # Store '7' to M(1031) -> y
+LOADI *MAX          # Relative Distance to MAX Method
+STORE 1024          # Store Distance to MAX Method in M(1024)
+MOVE pc acc
+STORE 1025          # Store PC in M(1025) -> To calc Return and Method adress
+JUMP CALL           # Call 'Call-Method'
+
+LOAD 1030           # ReturnValue of MAX(x,y)
+STORE 1
+
+# Now, call min(x,y)
+LOADI 2
+STORE 1026          # Store '2' to M(1026) -> Argument Count
+LOADIN 1 0          # <----- ARGUMENT x
+STORE 1030          # Store '6' to M(1030) -> x
+LOADIN 1 1          # <----- ARGUMENT y
+STORE 1031          # Store '7' to M(1031) -> y
+LOADI *MIN          # Relative Distance to MIN Method
+STORE 1024          # Store Distance to MIN Method in M(1024)
+MOVE pc acc
+STORE 1025          # Store PC in M(1025) -> To calc Return and Method adress
+JUMP CALL           # Call 'Call-Method'
+
+LOAD 1030           # ReturnValue of MIN(x,y)
+STORE 2
+LOAD 1              # M(1) is MAX(x,y)
+SUB 2               # MAX(x,y) - MIN(x,y)
+STORE 1             # MAX(x,y) no longer needed so overwrite
+
+# Recursive Call of GGT
+LOADI 2
+STORE 1026          # Store '2' to M(1026) -> Argument Count
+LOAD 1              # <----- ARGUMENT max(x,y) - min(x,y)
+STORE 1030          # Store '6' to M(1030) -> x
+LOAD 2              # <----- ARGUMENT min(x,y)
+STORE 1031          # Store '7' to M(1031) -> y
+LOADI *GGT         # Relative Distance to GGT Method
+STORE 1024          # Store Distance to GGT Method in M(1024)
+MOVE pc acc
+STORE 1025          # Store PC in M(1025) -> To calc Return and Method adress
+JUMP CALL           # Call 'Call-Method'
+
+LOAD 1030
+STOREIN 1 0         # Store Return Value in own ReturnValue Adress on Stack
+JUMP CALL_RETURN
+
+
+###### MIN METHOD ######
+MIN:
+LOAD 0                  # M(0) is always Pointer to first Arg
+MOVE acc in1
+LOADIN 1 0
+STORE 1                 # x is now at M(1)
+LOADIN 1 1
+SUB 1                   # y - x
+JUMPC >= CALL_RETURN    # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
+LOADIN 1 1
+STOREIN 1 0             # Store y in ReturnValue Adress
+JUMP CALL_RETURN
+
+###### MAX METHOD ######
+MAX:
+LOAD 0                  # M(0) is always Pointer to first Arg
+MOVE acc in1
+LOADIN 1 0
+STORE 1                 # x is now at M(1)
+LOADIN 1 1
+SUB 1                   # y - x
+JUMPC <= CALL_RETURN    # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
+LOADIN 1 1
+STOREIN 1 0             # Store y in ReturnValue Adress
+JUMP CALL_RETURN
+
+
+
+###### CALL METHOD ######
+CALL:
+# 1. Save IN1 to M(1028)
+MOVE in1 acc
+STORE 1028
+
+# 2. Copy Arguments to stack
+LOADI 0
+STORE 1027              # Use 1027 as loop counter (i)
+CALL_COPY_ARG_LOOP:
+LOAD 1026               # Load arg count (n)
+SUB 1027
+JUMPC <= CALL_SAVE_REGS # If i >= n, start saving registers
+LOADI 1030
+ADD 1027                # Address: 1030 + i
+MOVE acc in1
+LOADIN 1 0               # Load argument from transfer area
+STOREIN 2 0              # Push to stack
+MOVE in2 acc            # Increment stack pointer
+ADDI 1
+MOVE acc in2
+LOAD 1027               # Increment loop counter
+ADDI 1
+STORE 1027
+JUMP CALL_COPY_ARG_LOOP
+
+CALL_SAVE_REGS:
+# 3. Save M(0) to M(4) to stack
+LOADI 0
+STORE 1027              # Reuse counter
+CALL_SAVE_REGS_LOOP:
+LOADI 5
+SUB 1027
+JUMPC <= CALL_SAVE_CONTROL
+LOAD 1027
+MOVE acc in1            # Point to M(0...4)
+LOADIN 1 0
+STOREIN 2 0              # Push register to stack
+MOVE in2 acc            # Increment stack pointer
+ADDI 1
+MOVE acc in2
+LOAD 1027
+ADDI 1
+STORE 1027
+JUMP CALL_SAVE_REGS_LOOP
+
+CALL_SAVE_CONTROL:
+# 4. Save IN1 to Stack
+LOAD 1028
+STOREIN 2 0
+MOVE in2 acc
+ADDI 1
+MOVE acc in2
+
+# 5. Save Amount of Args (n) to Stack
+LOAD 1026
+STOREIN 2 0
+MOVE in2 acc
+ADDI 1
+MOVE acc in2
+
+# 6. Save Absolute Return Address to Stack (PC_ref + 3)
+LOAD 1025
+ADDI 3
+STOREIN 2 0
+MOVE in2 acc
+ADDI 1
+MOVE acc in2
+
+# 7. Save Adress of first Argument to M(0), just for QOL
+SUBI 8                  # Points so M(0) if arg_count = 0
+SUB 1026                # Points to first Argument
+STORE 0
+
+# 8. Jump to Absolute Method Address (Offset + PC_ref - 2)
+LOAD 1025
+ADD 1024
+SUBI 2
+MOVE acc pc
+
+
+CALL_RETURN:
+# 1. Pop Return Address to M(1024)
+MOVE in2 acc
+SUBI 1
+MOVE acc in2
+LOADIN 2 0               # Pop from stack
+STORE 1024
+
+# 2. Pop Arg count to M(1026)
+MOVE in2 acc
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
+STORE 1026
+
+MOVE in2 acc
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
+STORE 1028
+
+# 3. Restore M(4) down to M(0) (Reverse order)
+LOADI 4
+STORE 1027              # Start at register 4
+CALL_RESTORE_REGS_LOOP:
+LOAD 1027
+JUMPC < CALL_PREP_ARG_RETURN # If counter < 0, done
+MOVE acc in1            # Target register
+MOVE in2 acc            # Decrement stack pointer (Pop)
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
+STOREIN 1 0              # Restore value to M(i)
+LOAD 1027
+SUBI 1
+STORE 1027
+JUMP CALL_RESTORE_REGS_LOOP
+
+CALL_PREP_ARG_RETURN:
+# 4. Prep pointer for Return Arguments (M(1030 + n - 1))
+LOADI 1030
+ADD 1026
+SUBI 1
+STORE 1025              # Target pointer
+
+CALL_RETURN_ARG_LOOP:
+LOAD 1026
+JUMPC <= CALL_RETURN_DONE
+SUBI 1
+STORE 1026
+LOAD 1025
+MOVE acc in1
+MOVE in2 acc            # Decrement stack pointer (Pop)
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
+STOREIN 1 0              # Store return value back to transfer area
+LOAD 1025
+SUBI 1
+STORE 1025
+JUMP CALL_RETURN_ARG_LOOP
+
+CALL_RETURN_DONE:
+# 5. Restore IN1
+LOAD 1028
+MOVE acc in1
+
+# 6. Final Jump back to main program
+LOAD 1024
+MOVE acc pc

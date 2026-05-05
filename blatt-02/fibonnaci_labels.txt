@@ -1,0 +1,52 @@
+# Code is written with goal not to use IN2 because this could be used as stack-Pointer
+LOADI 6
+STORE 30            # Load n in Memory
+
+# Check for edge Cases (n==1 or n==2) and Prepare Memory
+LOAD 30
+JUMPC = nIs0        # Jump if n <= 0
+SUBI 2
+JUMPC <= nIs1or2    # Jump if n <= 2
+STORE 30
+LOADI 1
+STORE 0
+MOVE acc in1        # Store f(0) = f(1) = 1 in M(0) and IN1
+
+# f(n-1) is stored in IN1, f(n-2) is stored in M(0)
+# To copy f(n-1) to M(0) after calculating f(n) while not using IN2,
+# M(0) = ACC - M(0) = f(n) - f(n-1)
+
+calc:
+MOVE IN1 ACC
+ADD 0               # f(n-1) - f(n-2)
+MOVE ACC IN1
+SUB 0               # f(n) - f(n-1) = f(n-2)
+STORE 0             # Update f(n-2) in M(0)
+LOAD 30
+SUBI 1
+JUMPC = doneWithCalc
+STORE 30
+JUMP calc
+
+# if n == 0, return 0
+nIs0:
+LOADI 0
+STORE 33
+JUMP end
+
+# if n == 1 or n == 2, return 1
+nIs1or2:
+LOADI 1
+STORE 33
+JUMP end
+
+# if done, result is in IN1
+doneWithCalc:
+MOVE IN1 ACC
+STORE 33
+JUMP end
+
+end:
+PRINT 33
+loop:
+JUMP loop

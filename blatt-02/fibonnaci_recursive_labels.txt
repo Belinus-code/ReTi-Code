@@ -1,0 +1,243 @@
+# This Code uses a self-developed stack and call-Method
+# Call-Method takes care of jumping to method, returning from method,
+# Saving Arguments and Return Values, and storing M(0)-M(4) to Stack
+
+# On every Method-Call, Stack looks like this:
+# M(IN2): <empty>
+# M(IN2 - 1): return-Adress to Method call
+# M(IN2 - 2): amount of Arguments 0...n
+# M(IN2 - 3) - M(IN2 - 7): Copy of M(0) - M(4)
+# M(IN2 - 8) - M(IN2 - (8+n)): Arugments if n < 0
+
+# Calling a Method:
+# 0. Store all Important Values in M(0) - M(4)
+# 1. Store max(arg_count, ret_val_count) to M(1026)
+# 2. Store all Arguments to M(1030), M(1031), ...
+# 3. Store relative Distance to Method in M(1024)
+# 4. Store PC at M(1025)
+# 5. JUMP to CALL-Method
+# 6. Load Return Values from M(1030), ...
+
+# Also i wrote this code using labels instead of counting jump-Distances myself.
+# Labels were then replaced using my tool https://github.com/Belinus-code/ReTi-Label-Parser
+
+# Prepare Stack
+LOADI 2048          # Stack beginns at 2048
+MOVE acc in2        # IN2 is always Stackpointer
+
+# Fill M(0) to M(4) with data (Otherwise Python error)
+LOADI 0
+STORE 0
+STORE 1
+STORE 2
+STORE 3
+STORE 4
+
+# Method Call:
+LOADI 1
+STORE 1026          # Store '1' to M(1026) -> Argument Count
+LOADI 7             # <----- ARGUMENT n: f(n) 
+STORE 1030          # Store '7' to M(1030) -> First Argument 'n'
+LOADI *FIBONNACI_n  # Relative Distance to Fibonnaci Method
+STORE 1024          # Store Distance to FIBONNACI Method in M(1024)
+MOVE pc acc
+STORE 1025          # Store PC in M(1025) -> To calc Return and Method adress
+JUMP CALL           # Call 'Call-Method'
+
+LOAD 1030           # Return Value is in same Place as Arumgent
+STORE 0
+PRINT 0
+
+end:
+JUMP end
+
+
+###### FIBONNACI METHOD #####
+FIBONNACI_n:
+# Get Argument n from Stack
+MOVE in2 acc
+SUBI 8          # Argument is at Stack-Pointer - 8
+STORE 0         # Store Pointer to Arg at M(0)
+MOVE acc in1
+LOADIN 1 0
+STORE 1         # Store Arg n at M(1)
+
+# Check for edge-Cases (0 <= n <= 2)
+JUMPC <= FIB_IS_ZERO
+SUBI 2
+JUMPC <= FIB_IS_TWO
+
+# Recursive Call f(n-1)
+LOADI 1
+STORE 1026      # 1 Argument
+LOAD 1
+SUBI 1
+STORE 1030      # Argument is n - 1
+LOADI *FIBONNACI_n
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL       # Call Fibonnaci Method
+
+LOAD 1030
+STORE 2         # store f(n-1) in M(2)
+# PRINT 2
+
+# Recursive Call f(n - 2)
+LOADI 1
+STORE 1026      # 1 Argument
+LOAD 1
+SUBI 2
+STORE 1030      # Argument is n - 2
+LOADI *FIBONNACI_n
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+
+LOAD 0          # Load Pointer to Return-value on Stack
+MOVE acc in1
+
+LOAD 1030
+ADD 2           # ACC = f(n - 1) + f(n - 2)
+JUMP FIB_END
+
+FIB_IS_ZERO:
+LOADI 0
+JUMP FIB_END
+
+FIB_IS_TWO:
+LOADI 1
+JUMP FIB_END
+
+FIB_END:
+STOREIN 1 0     # Store Return Value in Stack
+JUMP CALL_RETURN
+
+
+
+###### CALL METHOD #####
+CALL:
+# 1. Copy Arguments to stack
+LOADI 0
+STORE 1027              # Use 1027 as loop counter (i)
+CALL_COPY_ARG_LOOP:
+LOAD 1026               # Load arg count (n)
+SUB 1027
+JUMPC <= CALL_SAVE_REGS # If i >= n, start saving registers
+LOADI 1030
+ADD 1027                # Address: 1030 + i
+MOVE acc in1
+LOADIN 1 0               # Load argument from transfer area
+STOREIN 2 0              # Push to stack
+MOVE in2 acc            # Increment stack pointer
+ADDI 1
+MOVE acc in2
+LOAD 1027               # Increment loop counter
+ADDI 1
+STORE 1027
+JUMP CALL_COPY_ARG_LOOP
+
+CALL_SAVE_REGS:
+# 2. Save M(0) to M(4) to stack
+LOADI 0
+STORE 1027              # Reuse counter
+CALL_SAVE_REGS_LOOP:
+LOADI 5
+SUB 1027
+JUMPC <= CALL_SAVE_CONTROL
+LOAD 1027
+MOVE acc in1            # Point to M(0...4)
+LOADIN 1 0
+STOREIN 2 0              # Push register to stack
+MOVE in2 acc            # Increment stack pointer
+ADDI 1
+MOVE acc in2
+LOAD 1027
+ADDI 1
+STORE 1027
+JUMP CALL_SAVE_REGS_LOOP
+
+CALL_SAVE_CONTROL:
+# 3. Save Amount of Args (n) to Stack
+LOAD 1026
+STOREIN 2 0
+MOVE in2 acc
+ADDI 1
+MOVE acc in2
+
+# 4. Save Absolute Return Address to Stack (PC_ref + 3)
+LOAD 1025
+ADDI 3
+STOREIN 2 0
+MOVE in2 acc
+ADDI 1
+MOVE acc in2
+
+# 5. Jump to Absolute Method Address (Offset + PC_ref - 2)
+LOAD 1025
+ADD 1024
+SUBI 2
+MOVE acc pc
+
+
+CALL_RETURN:
+# 1. Pop Return Address to M(1024)
+MOVE in2 acc
+SUBI 1
+MOVE acc in2
+LOADIN 2 0               # Pop from stack
+STORE 1024
+
+# 2. Pop Arg count to M(1026)
+MOVE in2 acc
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
+STORE 1026
+
+# 3. Restore M(4) down to M(0) (Reverse order)
+LOADI 4
+STORE 1027              # Start at register 4
+CALL_RESTORE_REGS_LOOP:
+LOAD 1027
+JUMPC < CALL_PREP_ARG_RETURN # If counter < 0, done
+MOVE acc in1            # Target register
+MOVE in2 acc            # Decrement stack pointer (Pop)
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
+STOREIN 1 0              # Restore value to M(i)
+LOAD 1027
+SUBI 1
+STORE 1027
+JUMP CALL_RESTORE_REGS_LOOP
+
+CALL_PREP_ARG_RETURN:
+# 4. Prep pointer for Return Arguments (M(1030 + n - 1))
+LOADI 1030
+ADD 1026
+SUBI 1
+STORE 1025              # Target pointer
+
+CALL_RETURN_ARG_LOOP:
+LOAD 1026
+JUMPC <= CALL_RETURN_DONE
+SUBI 1
+STORE 1026
+LOAD 1025
+MOVE acc in1
+MOVE in2 acc            # Decrement stack pointer (Pop)
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
+STOREIN 1 0              # Store return value back to transfer area
+LOAD 1025
+SUBI 1
+STORE 1025
+JUMP CALL_RETURN_ARG_LOOP
+
+CALL_RETURN_DONE:
+# 5. Final Jump back to main program
+LOAD 1024
+MOVE acc pc
