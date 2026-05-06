@@ -50,7 +50,7 @@ LOADI 9          # Relative Distance to GGT Method
 STORE 1024          # Store Distance to GTT Method in M(1024)
 MOVE pc acc
 STORE 1025          # Store PC in M(1025) -> To calc Return and Method adress
-JUMP 72           # Call 'Call-Method'
+JUMP 66           # Call 'Call-Method'
 
 LOAD 1030           # Return Value is in same Place as first Arumgent
 STORE 42
@@ -59,10 +59,8 @@ PRINT 42
 JUMP 0
 
 ###### GGT METHOD ######
-LOAD 0
-MOVE acc in1            # Pointer to x
 LOADIN 1 1              # Load y
-JUMPC = 122     # if y=0 Return x. x is already at returnValue Adress
+JUMPC = 119     # if y=0 Return x. x is already at returnValue Adress
 
 # y != 0, so use recursive Formula
 # First, call max(x,y):
@@ -72,11 +70,11 @@ LOADIN 1 0          # <----- ARGUMENT x
 STORE 1030          # Store '6' to M(1030) -> x
 LOADIN 1 1          # <----- ARGUMENT y
 STORE 1031          # Store '7' to M(1031) -> y
-LOADI 47          # Relative Distance to MAX Method
+LOADI 45          # Relative Distance to MAX Method
 STORE 1024          # Store Distance to MAX Method in M(1024)
 MOVE pc acc
 STORE 1025          # Store PC in M(1025) -> To calc Return and Method adress
-JUMP 53           # Call 'Call-Method'
+JUMP 49           # Call 'Call-Method'
 
 LOAD 1030           # ReturnValue of MAX(x,y)
 STORE 1
@@ -92,7 +90,7 @@ LOADI 24          # Relative Distance to MIN Method
 STORE 1024          # Store Distance to MIN Method in M(1024)
 MOVE pc acc
 STORE 1025          # Store PC in M(1025) -> To calc Return and Method adress
-JUMP 40           # Call 'Call-Method'
+JUMP 36           # Call 'Call-Method'
 
 LOAD 1030           # ReturnValue of MIN(x,y)
 STORE 2
@@ -107,40 +105,36 @@ LOAD 1              # <----- ARGUMENT max(x,y) - min(x,y)
 STORE 1030          # Store '6' to M(1030) -> x
 LOAD 2              # <----- ARGUMENT min(x,y)
 STORE 1031          # Store '7' to M(1031) -> y
-LOADI -39         # Relative Distance to GGT Method
+LOADI -37         # Relative Distance to GGT Method
 STORE 1024          # Store Distance to GGT Method in M(1024)
 MOVE pc acc
 STORE 1025          # Store PC in M(1025) -> To calc Return and Method adress
-JUMP 24           # Call 'Call-Method'
+JUMP 20           # Call 'Call-Method'
 
 LOAD 1030
 STOREIN 1 0         # Store Return Value in own ReturnValue Adress on Stack
-JUMP 79
+JUMP 76
 
 
 ###### MIN METHOD ######
-LOAD 0                  # M(0) is always Pointer to first Arg
-MOVE acc in1
 LOADIN 1 0
 STORE 1                 # x is now at M(1)
 LOADIN 1 1
 SUB 1                   # y - x
-JUMPC >= 72    # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
+JUMPC >= 71    # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
 LOADIN 1 1
 STOREIN 1 0             # Store y in ReturnValue Adress
-JUMP 69
+JUMP 68
 
 ###### MAX METHOD ######
-LOAD 0                  # M(0) is always Pointer to first Arg
-MOVE acc in1
 LOADIN 1 0
 STORE 1                 # x is now at M(1)
 LOADIN 1 1
 SUB 1                   # y - x
-JUMPC <= 62    # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
+JUMPC <= 63    # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
 LOADIN 1 1
 STOREIN 1 0             # Store y in ReturnValue Adress
-JUMP 59
+JUMP 60
 
 
 
@@ -211,6 +205,7 @@ MOVE acc in2
 # 7. Save Adress of first Argument to M(0), just for QOL
 SUBI 8                  # Points so M(0) if arg_count = 0
 SUB 1026                # Points to first Argument
+MOVE acc in1
 STORE 0
 
 # 8. Jump to Absolute Method Address (Offset + PC_ref - 2)

@@ -61,8 +61,6 @@ JUMP end
 
 ###### GGT METHOD ######
 GGT:
-LOAD 0
-MOVE acc in1            # Pointer to x
 LOADIN 1 1              # Load y
 JUMPC = CALL_RETURN     # if y=0 Return x. x is already at returnValue Adress
 
@@ -122,8 +120,6 @@ JUMP CALL_RETURN
 
 ###### MIN METHOD ######
 MIN:
-LOAD 0                  # M(0) is always Pointer to first Arg
-MOVE acc in1
 LOADIN 1 0
 STORE 1                 # x is now at M(1)
 LOADIN 1 1
@@ -135,8 +131,6 @@ JUMP CALL_RETURN
 
 ###### MAX METHOD ######
 MAX:
-LOAD 0                  # M(0) is always Pointer to first Arg
-MOVE acc in1
 LOADIN 1 0
 STORE 1                 # x is now at M(1)
 LOADIN 1 1
@@ -220,6 +214,7 @@ MOVE acc in2
 # 7. Save Adress of first Argument to M(0), just for QOL
 SUBI 8                  # Points so M(0) if arg_count = 0
 SUB 1026                # Points to first Argument
+MOVE acc in1
 STORE 0
 
 # 8. Jump to Absolute Method Address (Offset + PC_ref - 2)
