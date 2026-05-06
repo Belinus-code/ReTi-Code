@@ -60,7 +60,7 @@ JUMP 0
 
 ###### GGT METHOD ######
 LOADIN 1 1              # Load y
-JUMPC = 117     # if y=0 Return x. x is already at returnValue Adress
+JUMPC = 108     # if y=0 Return x. x is already at returnValue Adress
 
 # y != 0, so use recursive Formula
 # First, call max(x,y):
@@ -113,7 +113,7 @@ JUMP 20           # Call 'Call-Method'
 
 LOAD 1030
 STOREIN 1 0         # Store Return Value in own ReturnValue Adress on Stack
-JUMP 74
+JUMP 65
 
 
 ###### MIN METHOD ######
@@ -121,20 +121,20 @@ LOADIN 1 0
 STORE 1                 # x is now at M(1)
 LOADIN 1 1
 SUB 1                   # y - x
-JUMPC >= 69    # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
+JUMPC >= 60    # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
 LOADIN 1 1
 STOREIN 1 0             # Store y in ReturnValue Adress
-JUMP 66
+JUMP 57
 
 ###### MAX METHOD ######
 LOADIN 1 0
 STORE 1                 # x is now at M(1)
 LOADIN 1 1
 SUB 1                   # y - x
-JUMPC <= 61    # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
+JUMPC <= 52    # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
 LOADIN 1 1
 STOREIN 1 0             # Store y in ReturnValue Adress
-JUMP 58
+JUMP 49
 
 
 
@@ -142,28 +142,23 @@ JUMP 58
 
 # 1. Save IN1 to Stack
 MOVE in1 acc
-STOREIN 2 0
-MOVE in2 acc
-ADDI 1
-MOVE acc in2
+STOREIN 2 0             # Stack +1
 
 # 2. Save M(0) to M(4) to stack
-LOADI 0
-STORE 1027              # Reuse counter
-LOADI 5
-SUB 1027
-JUMPC <= 12
-LOAD 1027
-MOVE acc in1            # Point to M(0...4)
-LOADIN 1 0
-STOREIN 2 0              # Push register to stack
-MOVE in2 acc            # Increment stack pointer
-ADDI 1
+LOAD 0
+STOREIN 2 1
+LOAD 1
+STOREIN 2 2
+LOAD 2
+STOREIN 2 3
+LOAD 3
+STOREIN 2 4
+LOAD 4
+STOREIN 2 5             # Stack +6
+
+MOVE in2 acc
+ADDI 6
 MOVE acc in2
-LOAD 1027
-ADDI 1
-STORE 1027
-JUMP -13
 
 # 3. Copy Arguments to stack
 LOADI 0
@@ -187,16 +182,13 @@ JUMP -14
 # 4. Save Amount of Args (n) to Stack
 LOAD 1026
 STOREIN 2 0
-MOVE in2 acc
-ADDI 1
-MOVE acc in2
 
 # 5. Save Absolute Return Address to Stack (PC_ref + 3)
 LOAD 1025
 ADDI 3
-STOREIN 2 0
+STOREIN 2 1
 MOVE in2 acc
-ADDI 1
+ADDI 2
 MOVE acc in2
 
 # 6. Save Adress of first Argument to M(0), just for QOL
