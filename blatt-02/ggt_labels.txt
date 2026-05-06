@@ -6,9 +6,9 @@
 # M(IN2): <empty>
 # M(IN2 - 1): return-Adress to Method call
 # M(IN2 - 2): amount of Arguments 0...n
-# M(IN2 - 3): IN1 Register
-# M(IN2 - 4) - M(IN2 - 8): Copy of M(0) - M(4)
-# M(IN2 - 9) - M(IN2 - (9+n)): Arugments if n > 0
+# M(IN2 - 3) - M(IN2 - (2+n)): Arugments if n > 0
+# M(IN2 - (3+n)) - M(IN2 - (8+n)): Copy of M(0) - M(4)
+# M(IN2 - (9+n)): IN1 Register
 
 # Calling a Method:
 # 0. Store all Important Values in M(0) - M(4) and IN1
@@ -35,9 +35,9 @@ STORE 3
 STORE 4
 MOVE acc in1
 
-LOADI 4
+LOADI 6
 STORE 40
-LOADI 2
+LOADI 3
 STORE 41
 
 LOADI 2
@@ -143,18 +143,43 @@ JUMP CALL_RETURN
 
 
 ###### CALL METHOD ######
-CALL:
-# 1. Save IN1 to M(1028)
-MOVE in1 acc
-STORE 1028
 
-# 2. Copy Arguments to stack
+CALL:
+# 1. Save IN1 to Stack
+MOVE in1 acc
+STOREIN 2 0
+MOVE in2 acc
+ADDI 1
+MOVE acc in2
+
+# 2. Save M(0) to M(4) to stack
+CALL_SAVE_REGS_LOOP:
+LOADI 0
+STORE 1027              # Reuse counter
+CALL_SAVE_REGS_LOOP:
+LOADI 5
+SUB 1027
+JUMPC <= CALL_COPY_ARG
+LOAD 1027
+MOVE acc in1            # Point to M(0...4)
+LOADIN 1 0
+STOREIN 2 0              # Push register to stack
+MOVE in2 acc            # Increment stack pointer
+ADDI 1
+MOVE acc in2
+LOAD 1027
+ADDI 1
+STORE 1027
+JUMP CALL_SAVE_REGS_LOOP
+
+# 3. Copy Arguments to stack
+CALL_COPY_ARG:
 LOADI 0
 STORE 1027              # Use 1027 as loop counter (i)
 CALL_COPY_ARG_LOOP:
 LOAD 1026               # Load arg count (n)
 SUB 1027
-JUMPC <= CALL_SAVE_REGS # If i >= n, start saving registers
+JUMPC <= CALL_ARGS_DONE # If i >= n, start saving registers
 LOADI 1030
 ADD 1027                # Address: 1030 + i
 MOVE acc in1
@@ -168,42 +193,15 @@ ADDI 1
 STORE 1027
 JUMP CALL_COPY_ARG_LOOP
 
-CALL_SAVE_REGS:
-# 3. Save M(0) to M(4) to stack
-LOADI 0
-STORE 1027              # Reuse counter
-CALL_SAVE_REGS_LOOP:
-LOADI 5
-SUB 1027
-JUMPC <= CALL_SAVE_CONTROL
-LOAD 1027
-MOVE acc in1            # Point to M(0...4)
-LOADIN 1 0
-STOREIN 2 0              # Push register to stack
-MOVE in2 acc            # Increment stack pointer
-ADDI 1
-MOVE acc in2
-LOAD 1027
-ADDI 1
-STORE 1027
-JUMP CALL_SAVE_REGS_LOOP
-
-CALL_SAVE_CONTROL:
-# 4. Save IN1 to Stack
-LOAD 1028
-STOREIN 2 0
-MOVE in2 acc
-ADDI 1
-MOVE acc in2
-
-# 5. Save Amount of Args (n) to Stack
+# 4. Save Amount of Args (n) to Stack
+CALL_ARGS_DONE:
 LOAD 1026
 STOREIN 2 0
 MOVE in2 acc
 ADDI 1
 MOVE acc in2
 
-# 6. Save Absolute Return Address to Stack (PC_ref + 3)
+# 5. Save Absolute Return Address to Stack (PC_ref + 3)
 LOAD 1025
 ADDI 3
 STOREIN 2 0
@@ -211,13 +209,13 @@ MOVE in2 acc
 ADDI 1
 MOVE acc in2
 
-# 7. Save Adress of first Argument to M(0), just for QOL
-SUBI 8                  # Points so M(0) if arg_count = 0
-SUB 1026                # Points to first Argument
+# 6. Save Adress of first Argument to M(0), just for QOL
+SUBI 2                  # Points so arg_count
+SUB 1026                # Now points to first Argument
 MOVE acc in1
 STORE 0
 
-# 8. Jump to Absolute Method Address (Offset + PC_ref - 2)
+# 7. Jump to Absolute Method Address (Offset + PC_ref - 2)
 LOAD 1025
 ADD 1024
 SUBI 2
@@ -239,29 +237,7 @@ MOVE acc in2
 LOADIN 2 0
 STORE 1026
 
-MOVE in2 acc
-SUBI 1
-MOVE acc in2
-LOADIN 2 0
-STORE 1028
-
-# 3. Restore M(4) down to M(0) (Reverse order)
-LOADI 4
-STORE 1027              # Start at register 4
-CALL_RESTORE_REGS_LOOP:
-LOAD 1027
-JUMPC < CALL_PREP_ARG_RETURN # If counter < 0, done
-MOVE acc in1            # Target register
-MOVE in2 acc            # Decrement stack pointer (Pop)
-SUBI 1
-MOVE acc in2
-LOADIN 2 0
-STOREIN 1 0              # Restore value to M(i)
-LOAD 1027
-SUBI 1
-STORE 1027
-JUMP CALL_RESTORE_REGS_LOOP
-
+# 3. Pop all Arguments/Return Values
 CALL_PREP_ARG_RETURN:
 # 4. Prep pointer for Return Arguments (M(1030 + n - 1))
 LOADI 1030
@@ -271,7 +247,7 @@ STORE 1025              # Target pointer
 
 CALL_RETURN_ARG_LOOP:
 LOAD 1026
-JUMPC <= CALL_RETURN_DONE
+JUMPC <= CALL_RESOTRE_REGS
 SUBI 1
 STORE 1026
 LOAD 1025
@@ -286,9 +262,30 @@ SUBI 1
 STORE 1025
 JUMP CALL_RETURN_ARG_LOOP
 
+# 4. Restore M(4) down to M(0) (Reverse order)
+CALL_RESOTRE_REGS:
+LOADI 4
+STORE 1027              # Start at register 4
+CALL_RESTORE_REGS_LOOP:
+LOAD 1027
+JUMPC < CALL_RETURN_DONE # If counter < 0, done
+MOVE acc in1            # Target register
+MOVE in2 acc            # Decrement stack pointer (Pop)
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
+STOREIN 1 0              # Restore value to M(i)
+LOAD 1027
+SUBI 1
+STORE 1027
+JUMP CALL_RESTORE_REGS_LOOP
+
 CALL_RETURN_DONE:
-# 5. Restore IN1
-LOAD 1028
+# 3. Pop IN1 Pointer to IN1
+MOVE in2 acc
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
 MOVE acc in1
 
 # 6. Final Jump back to main program

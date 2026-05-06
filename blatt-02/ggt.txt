@@ -6,9 +6,9 @@
 # M(IN2): <empty>
 # M(IN2 - 1): return-Adress to Method call
 # M(IN2 - 2): amount of Arguments 0...n
-# M(IN2 - 3): IN1 Register
-# M(IN2 - 4) - M(IN2 - 8): Copy of M(0) - M(4)
-# M(IN2 - 9) - M(IN2 - (9+n)): Arugments if n > 0
+# M(IN2 - 3) - M(IN2 - (2+n)): Arugments if n > 0
+# M(IN2 - (3+n)) - M(IN2 - (8+n)): Copy of M(0) - M(4)
+# M(IN2 - (9+n)): IN1 Register
 
 # Calling a Method:
 # 0. Store all Important Values in M(0) - M(4) and IN1
@@ -35,9 +35,9 @@ STORE 3
 STORE 4
 MOVE acc in1
 
-LOADI 4
+LOADI 6
 STORE 40
-LOADI 2
+LOADI 3
 STORE 41
 
 LOADI 2
@@ -60,7 +60,7 @@ JUMP 0
 
 ###### GGT METHOD ######
 LOADIN 1 1              # Load y
-JUMPC = 119     # if y=0 Return x. x is already at returnValue Adress
+JUMPC = 117     # if y=0 Return x. x is already at returnValue Adress
 
 # y != 0, so use recursive Formula
 # First, call max(x,y):
@@ -113,7 +113,7 @@ JUMP 20           # Call 'Call-Method'
 
 LOAD 1030
 STOREIN 1 0         # Store Return Value in own ReturnValue Adress on Stack
-JUMP 76
+JUMP 74
 
 
 ###### MIN METHOD ######
@@ -121,29 +121,51 @@ LOADIN 1 0
 STORE 1                 # x is now at M(1)
 LOADIN 1 1
 SUB 1                   # y - x
-JUMPC >= 71    # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
+JUMPC >= 69    # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
 LOADIN 1 1
 STOREIN 1 0             # Store y in ReturnValue Adress
-JUMP 68
+JUMP 66
 
 ###### MAX METHOD ######
 LOADIN 1 0
 STORE 1                 # x is now at M(1)
 LOADIN 1 1
 SUB 1                   # y - x
-JUMPC <= 63    # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
+JUMPC <= 61    # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
 LOADIN 1 1
 STOREIN 1 0             # Store y in ReturnValue Adress
-JUMP 60
+JUMP 58
 
 
 
 ###### CALL METHOD ######
-# 1. Save IN1 to M(1028)
-MOVE in1 acc
-STORE 1028
 
-# 2. Copy Arguments to stack
+# 1. Save IN1 to Stack
+MOVE in1 acc
+STOREIN 2 0
+MOVE in2 acc
+ADDI 1
+MOVE acc in2
+
+# 2. Save M(0) to M(4) to stack
+LOADI 0
+STORE 1027              # Reuse counter
+LOADI 5
+SUB 1027
+JUMPC <= 12
+LOAD 1027
+MOVE acc in1            # Point to M(0...4)
+LOADIN 1 0
+STOREIN 2 0              # Push register to stack
+MOVE in2 acc            # Increment stack pointer
+ADDI 1
+MOVE acc in2
+LOAD 1027
+ADDI 1
+STORE 1027
+JUMP -13
+
+# 3. Copy Arguments to stack
 LOADI 0
 STORE 1027              # Use 1027 as loop counter (i)
 LOAD 1026               # Load arg count (n)
@@ -162,39 +184,14 @@ ADDI 1
 STORE 1027
 JUMP -14
 
-# 3. Save M(0) to M(4) to stack
-LOADI 0
-STORE 1027              # Reuse counter
-LOADI 5
-SUB 1027
-JUMPC <= 12
-LOAD 1027
-MOVE acc in1            # Point to M(0...4)
-LOADIN 1 0
-STOREIN 2 0              # Push register to stack
-MOVE in2 acc            # Increment stack pointer
-ADDI 1
-MOVE acc in2
-LOAD 1027
-ADDI 1
-STORE 1027
-JUMP -13
-
-# 4. Save IN1 to Stack
-LOAD 1028
-STOREIN 2 0
-MOVE in2 acc
-ADDI 1
-MOVE acc in2
-
-# 5. Save Amount of Args (n) to Stack
+# 4. Save Amount of Args (n) to Stack
 LOAD 1026
 STOREIN 2 0
 MOVE in2 acc
 ADDI 1
 MOVE acc in2
 
-# 6. Save Absolute Return Address to Stack (PC_ref + 3)
+# 5. Save Absolute Return Address to Stack (PC_ref + 3)
 LOAD 1025
 ADDI 3
 STOREIN 2 0
@@ -202,13 +199,13 @@ MOVE in2 acc
 ADDI 1
 MOVE acc in2
 
-# 7. Save Adress of first Argument to M(0), just for QOL
-SUBI 8                  # Points so M(0) if arg_count = 0
-SUB 1026                # Points to first Argument
+# 6. Save Adress of first Argument to M(0), just for QOL
+SUBI 2                  # Points so arg_count
+SUB 1026                # Now points to first Argument
 MOVE acc in1
 STORE 0
 
-# 8. Jump to Absolute Method Address (Offset + PC_ref - 2)
+# 7. Jump to Absolute Method Address (Offset + PC_ref - 2)
 LOAD 1025
 ADD 1024
 SUBI 2
@@ -229,28 +226,7 @@ MOVE acc in2
 LOADIN 2 0
 STORE 1026
 
-MOVE in2 acc
-SUBI 1
-MOVE acc in2
-LOADIN 2 0
-STORE 1028
-
-# 3. Restore M(4) down to M(0) (Reverse order)
-LOADI 4
-STORE 1027              # Start at register 4
-LOAD 1027
-JUMPC < 11 # If counter < 0, done
-MOVE acc in1            # Target register
-MOVE in2 acc            # Decrement stack pointer (Pop)
-SUBI 1
-MOVE acc in2
-LOADIN 2 0
-STOREIN 1 0              # Restore value to M(i)
-LOAD 1027
-SUBI 1
-STORE 1027
-JUMP -11
-
+# 3. Pop all Arguments/Return Values
 # 4. Prep pointer for Return Arguments (M(1030 + n - 1))
 LOADI 1030
 ADD 1026
@@ -273,8 +249,27 @@ SUBI 1
 STORE 1025
 JUMP -14
 
-# 5. Restore IN1
-LOAD 1028
+# 4. Restore M(4) down to M(0) (Reverse order)
+LOADI 4
+STORE 1027              # Start at register 4
+LOAD 1027
+JUMPC < 11 # If counter < 0, done
+MOVE acc in1            # Target register
+MOVE in2 acc            # Decrement stack pointer (Pop)
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
+STOREIN 1 0              # Restore value to M(i)
+LOAD 1027
+SUBI 1
+STORE 1027
+JUMP -11
+
+# 3. Pop IN1 Pointer to IN1
+MOVE in2 acc
+SUBI 1
+MOVE acc in2
+LOADIN 2 0
 MOVE acc in1
 
 # 6. Final Jump back to main program
