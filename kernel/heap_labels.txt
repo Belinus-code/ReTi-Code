@@ -1,0 +1,465 @@
+JUMP PREPARE_STACK
+SETUP:
+LOADI 1
+STORE 1026              # Store '1' to M(1026) -> Argument Count
+LOADI 5                 # <----- ARGUMENT n
+STORE 1030              # Store n to M(1030)
+LOADI *MALLOC              # Relative Distance to GGT Method (See Label Parser)
+STORE 1024              # Store Distance to GTT Method in M(1024)
+MOVE pc acc
+STORE 1025              # Store PC in M(1025) -> To calc Return and Method adress
+JUMP CALL               # Call 'Call-Method'
+
+LOAD 1030               # Return Value is in same Place as first Arumgent
+STORE 1
+PRINT 1
+
+LOADI 1
+STORE 1026              # Store '1' to M(1026) -> Argument Count
+LOADI 5                 # <----- ARGUMENT n
+STORE 1030              # Store n to M(1030)
+LOADI *MALLOC              # Relative Distance to MALLOC Method (See Label Parser)
+STORE 1024              # Store Distance to MALLOC Method in M(1024)
+MOVE pc acc
+STORE 1025              # Store PC in M(1025) -> To calc Return and Method adress
+JUMP CALL               # Call 'Call-Method'
+
+LOAD 1030               # Return Value is in same Place as first Arumgent
+STORE 2
+PRINT 2
+PRINT 4095
+
+LOADI 1
+STORE 1026              # Store '1' to M(1026) -> Argument Count
+LOAD 2                  # <----- ARGUMENT n
+STORE 1030              # Store n to M(1030)
+LOADI *FREE             # Relative Distance to FREE Method (See Label Parser)
+STORE 1024              # Store Distance to FREE Method in M(1024)
+MOVE pc acc
+STORE 1025              # Store PC in M(1025) -> To calc Return and Method adress
+JUMP CALL               # Call 'Call-Method'
+PRINT 4095
+
+LOADI 1
+STORE 1026              # Store '1' to M(1026) -> Argument Count
+LOAD 1                  # <----- ARGUMENT n
+STORE 1030              # Store n to M(1030)
+LOADI *FREE             # Relative Distance to GGT Method (See Label Parser)
+STORE 1024              # Store Distance to GTT Method in M(1024)
+MOVE pc acc
+STORE 1025              # Store PC in M(1025) -> To calc Return and Method adress
+JUMP CALL               # Call 'Call-Method'
+PRINT 4095
+
+JUMP END
+
+###### PREPARE STACK ######
+PREPARE_STACK:
+# Prepare Stack
+LOADI 2048              # Stack beginns at 2048
+MOVE acc in2            # IN2 is always Stackpointer
+LOADI 4095
+STORE 4095              # Store Heap Top Pointer
+
+# Fill M(0) to M(4) and IN1 with data (Otherwise Python error)
+LOADI 0
+STORE 0
+STORE 1
+STORE 2
+STORE 3
+STORE 4
+MOVE acc in1
+JUMP SETUP
+
+###### END ######
+END:
+    JUMP END
+
+###### MIN METHOD ######
+MIN:
+    LOADIN 1 0              # IN1 is Frame-Pointer because Call Method puts it there
+    STORE 1                 # x is now at M(1)
+    LOADIN 1 1
+    SUB 1                   # y - x
+    JUMPC >= RETURN    # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
+    LOADIN 1 1
+    STOREIN 1 0             # Store y in ReturnValue Adress
+    JUMP RETURN
+
+###### MAX METHOD ######
+MAX:
+    LOADIN 1 0
+    STORE 1                 # x is now at M(1)
+    LOADIN 1 1
+    SUB 1                   # y - x
+    JUMPC <= RETURN    # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
+    LOADIN 1 1
+    STOREIN 1 0             # Store y in ReturnValue Adress
+    JUMP RETURN
+
+###### MUL METHOD ######
+MUL:
+    LOADIN 1 1
+    STORE 2             # y Value
+    JUMPC >= MULCHECKX
+    LOADI 0
+    SUB 2
+    STORE 2             # If y<0 negate y
+MULCHECKX:
+    LOADIN 1 0
+    STORE 1
+    LOADIN 1 1
+    JUMPC = RETURN      # if x is zero, zero is in return_adr, so return
+    JUMPC >= MULSTART
+    LOADI 0
+    SUB 1
+    STORE 1
+MULSTART:
+    LOADI 0             # Start with Zero
+    STORE 3
+MUL_LOOP:
+    LOAD 2
+    JUMPC <= MUL_DONE
+    SUBI 1
+    STORE 2
+    LOAD 3
+    ADD 1
+    STORE 3
+    JUMP MUL_LOOP
+MUL_DONE:
+    LOAD 0
+    MOVE acc in1
+    LOAD 3
+    STOREIN 1 0
+    JUMP RETURN
+
+###### MALLOC METHOD ######
+MALLOC:
+    LOADIN 1 0
+    STORE 1                 # Size of to alloc memory
+    LOADI 4096              # Points of first frame
+    MOVE acc in1
+MALLOC_SEARCH_LOOP:
+    MOVE in1 acc
+    SUB 4095
+    JUMPC > MALLOC_HEAP_END
+    LOADIN 1 1              # Frame used?
+    JUMPC > MALLOC_GO_NEXT
+    LOADIN 1 0
+    SUB 1
+    SUBI 3
+    JUMPC >= MALLOC_FOUND
+MALLOC_GO_NEXT:
+    LOADIN 1 0              # Load Frame Size
+    STORE 2                 # Store Frame Size to M(2)
+    MOVE in1 acc
+    ADD 2                   # Frame Pointer + Frame Size 
+    MOVE acc in1            # Point to next Frame
+    JUMP MALLOC_SEARCH_LOOP
+MALLOC_FOUND:
+    # If found but not at heap end, check if not last block before end
+    # Check if block could be splitt in two, second block would need 4
+    # Right now Data_len of current block is in acc
+    SUBI 3
+    JUMPC > MALLOC_ALLOC    # If no Jump then split block
+    LAODIN 1 0
+    STORE 3                 # Store original Frame Size in M(3)
+    LOAD 1
+    ADD 3
+    STOREIN 1 0             # Change Frame Size to new Size
+    LOAD 2                  # Save new Frame Size
+    LOADI 1
+    STOREIN 1 1             # Mark Frame as used
+
+    # Now store new Frame size at end of Frame
+    MOVE in1 acc
+    STORE 4                 # Store Pointer of this Frame
+    ADD 2                   # Points to next Frame
+    MOVE acc in1
+    LOAD 2
+    STOREIN 1 -1            # Store new Frame size at end of Frame
+    LOAD 4
+    MOVE acc in1            # Restore Pointer to Frame Start
+
+    # Before setting up splitt Block between this and next Block,
+    # Check if this Block is last Block before Top of Heap
+    MOVE in1 acc
+    SUB 4095
+    JUMPC <= MALLOC_FINISH   # Zero if this is last block. If negative, smth went wrong
+
+    # Now create split Block after this one
+    LOADIN 1 0              # New Frame Size
+    STORE 2
+    MOVE in1 acc
+    ADD 2
+    MOVE acc in1            # Point to new split Frame
+    LOADI 0
+    STOREIN 1 1             # Mark as unused
+    # Calculate split Block size
+    LOAD 3                  # Original Block Size
+    SUBI 3
+    SUB 1                   
+    STOREIN 1 0             # Store split block size
+    STORE 3
+    # Store split Block size at end of split Frame
+    MOVE in1 acc
+    ADD 3                   # Points to next Frame
+    MOVE acc in1
+    LOAD 3
+    STOREIN 1 -1            # Store new Frame size at end of Frame
+    JUMP MALLOC_FINISH
+    # Done with this branch
+
+MALLOC_HEAP_END:
+    LOAD 1                  # Args count
+    ADDI 3
+    STOREIN 1 0             # Store Frame Size on Heap
+    STORE 2
+
+    # Now store new Frame size at end of Frame
+    MOVE in1 acc
+    STORE 4                 # Store Pointer of this Frame
+    STORE 4095              # Update Heap Top Pointer
+    ADD 2                   # Points to next Frame
+    MOVE acc in1
+    LOAD 2
+    STOREIN 1 -1            # Store new Frame size at end of Frame
+    LOAD 4
+    MOVE acc in1            # Restore Pointer to Frame Start
+
+# Alloc without splitting
+MALLOC_ALLOC:
+    LOADI 1
+    STOREIN 1 1             # Mark Frame as used
+    MOVE in1 acc
+    STORE 4
+    JUMP MALLOC_FINISH
+
+MALLOC_FINISH:
+    LOAD 0
+    MOVE acc in1                # Load Pointer to return arg
+    LOAD 4                      # Pointer to Heap Frame
+    ADDI 2                      # Now point to first arg in heap Frame
+    STOREIN 1 0
+    JUMP RETURN
+
+###### FREE METHOD ######
+FREE:
+    LOADIN 1 0                  # Heap Pointer to data
+    SUBI 2                      # Change pointer to frame start
+    STORE 1
+    MOVE acc in1                # Heap Frame Pointer in IN1
+    LOADI 0
+    STOREIN 1 1                 # Mark Frame as unused
+
+    # Check if Frame is last Frame on heap
+    LOAD 1
+    SUB 4095
+    JUMPC >= FREE_LAST_FRAME
+
+    # Now check if Frame behind is unused
+    LOADIN 1 0
+    STORE 2
+    MOVE in1 acc
+    ADD 2
+    MOVE acc in1
+    LOADIN 1 1                  # Is next Frame used?
+    JUMPC > FREE_CHECK_UNDER    # JUMP if used
+    # Fuse this and next Frame
+    LOADIN 1 0
+    STORE 3                     # Store size of next Block
+    LOAD 1
+    MOVE acc in1                # Restore frame pointer to Block
+    LOAD 3                      # Load size of next Block
+    ADD 2                       # Add size of this Block
+    STOREIN 1 0                 # Update size of Block
+    STORE 2
+    MOVE in1 acc
+    ADD 2
+    MOVE acc in1                # Jump to end of fused Frame
+    LOAD 2
+    STOREIN 1 -1                # Update Frame Length at end of Frame
+    MOVE in1 acc
+    SUB 2
+    MOVE acc in1                # Restore Pointer to Frame
+    # Before checking Block before, ensure that this Block is not at M(4096)
+    SUBI 4096
+    JUMPC <= RETURN
+
+FREE_CHECK_UNDER:
+    LOADIN 1 -1
+    STORE 3
+    MOVE in1 acc
+    SUB 3
+    MOVE acc in1
+    LOADIN 1 1
+    JUMPC > RETURN              # If Block before is used, Return
+    LOAD 3
+    ADD 2
+    STOREIN 1 0
+    STORE 2
+    MOVE in1 acc
+    ADD 2
+    MOVE acc in1                # Jump to end of fused Frame
+    LOAD 2
+    STOREIN 1 -1                # Update Frame Length at end of Frame
+    JUMP RETURN
+
+
+FREE_LAST_FRAME:
+    # Update Heap Top Pointer
+    LOAD 4095                   # Heap Top Pointer
+    SUBI 4096
+    JUMPC <= FREE_BOTTOM_STACK
+
+    # Now check if Frame before is unused. Delete both if so
+    LOADIN 1 -1
+    STORE 3
+    MOVE in1 acc
+    SUB 3
+    MOVE acc in1
+    LOADIN 1 1
+    JUMPC = FREE_LAST_FRAME_CON
+    MOVE in1 acc
+    ADD 3
+    MOVE acc in1
+
+FREE_LAST_FRAME_CON:
+    MOVE in1 acc
+    SUBI 4096
+    JUMPC <= FREE_BOTTOM_STACK
+    LOADIN 1 -1
+    STORE 3
+    MOVE in1 acc
+    SUB 3
+    STORE 4095                  # Store updated Heap top Pointer
+    JUMP RETURN
+
+FREE_BOTTOM_STACK:
+    LOADI 4095
+    STORE 4095
+    JUMP RETURN
+
+
+###### CALL METHOD ######
+CALL:
+    # 1. Save IN1 to Stack
+    MOVE in1 acc
+    STOREIN 2 0             # Dont Increse Stack now to save code
+
+    # 2. Save M(0) to M(4) to stack
+    LOAD 0
+    STOREIN 2 1             # Manuell Increment of Stack to save Code
+    LOAD 1
+    STOREIN 2 2
+    LOAD 2
+    STOREIN 2 3
+    LOAD 3
+    STOREIN 2 4
+    LOAD 4
+    STOREIN 2 5             # Stack +6
+
+    # 3. Copy n Arguments to stack
+    LOADI 0
+    STORE 1027              # Use 1027 as loop counter (i)
+CALL_COPY_ARG_LOOP:
+    LOAD 1026               # Load arg count (n)
+    SUB 1027
+    JUMPC <= CALL_ARGS_DONE # If i >= n, continue
+    LOADI 1030
+    ADD 1027                # Address: 1030 + i
+    MOVE acc in1
+    LOADIN 1 0              # Load argument from transfer area
+    STOREIN 2 6             # Push to stack
+    MOVE in2 acc            # Increment stack pointer
+    ADDI 1
+    MOVE acc in2
+    LOAD 1027               # Increment loop counter
+    ADDI 1
+    STORE 1027
+    JUMP CALL_COPY_ARG_LOOP
+
+# 4. Save Amount of Args (n) to Stack
+CALL_ARGS_DONE:
+    LOAD 1026               # M (1026) is arg count
+    STOREIN 2 6
+
+    # 5. Save Absolute Return Address to Stack (PC_ref + 3)
+    LOAD 1025
+    ADDI 3                  # Copying PC to M(1025) must be third last instruction
+    STOREIN 2 7
+    MOVE in2 acc
+    ADDI 8                  # finally update Stack-Pointer
+    MOVE acc in2
+
+    # 6. Save Adress of first Argument to M(0), just for QOL
+    SUBI 2                  # Stack-Counter - 2 Points to arg_count
+    SUB 1026                # Now points to first Argument
+    MOVE acc in1
+    STORE 0
+
+    # 7. Jump to Absolute Method Address (Offset + PC_ref - 2)
+    LOAD 1025
+    ADD 1024
+    SUBI 2
+    MOVE acc pc
+
+###### RETURN METHOD ######
+# Not as much comments because same as call just reverse
+RETURN:
+    # 1. Pop Return Address to M(1024)
+    LOADIN 2 -1             # Pop from stack
+    STORE 1024
+
+    # 2. Pop Arg count to M(1026)
+    LOADIN 2 -2
+    STORE 1026
+
+    CALL_PREP_ARG_RETURN:
+    # 3. Pop Arguments from Stack to M(1030)...
+    LOADI 1030
+    ADD 1026
+    SUBI 1
+    STORE 1025              # Target pointer
+
+RETURN_ARG_LOOP:
+    LOAD 1026
+    JUMPC <= CALL_RESOTRE_REGS
+    SUBI 1
+    STORE 1026
+    LOAD 1025
+    MOVE acc in1
+    MOVE in2 acc            # Decrement stack pointer (Pop)
+    SUBI 1
+    MOVE acc in2
+    LOADIN 2 -2
+    STOREIN 1 0             # Store return value back to transfer area
+    LOAD 1025
+    SUBI 1
+    STORE 1025
+    JUMP RETURN_ARG_LOOP
+
+# 4. Restore M(4) down to M(0) (Reverse order)
+CALL_RESOTRE_REGS:
+    LOADIN 2 -3
+    STORE 4
+    LOADIN 2 -4
+    STORE 3
+    LOADIN 2 -5
+    STORE 2
+    LOADIN 2 -6
+    STORE 1
+    LOADIN 2 -7
+    STORE 0
+
+    # 5. Pop IN1 Pointer to IN1
+    LOADIN 2 -8
+    MOVE acc in1
+
+    MOVE in2 acc
+    SUBI 8
+    MOVE acc in2
+
+    # 6. Final Jump back to main program
+    LOAD 1024
+    MOVE acc pc

@@ -265,3 +265,37 @@ MOVE acc in2
 # 6. Final Jump back to main program
 LOAD 1024
 MOVE acc pc
+
+###### MUL METHOD ######
+# 4 Different loops for correct 
+MUL:
+    LOADIN 1 0
+    STORE 1
+    LOADIN 1 1
+    STORE 2
+    LOADI 0             # Start with Zero
+    MOVE acc in1
+MUL_LOOP:
+    LOAD 2
+    JUMPC <= MUL_DONE
+    SUBI 1
+    STORE 2
+    MOVE in1 acc
+    ADD 1
+    MOVE acc in1
+    JUMP MUL_LOOP
+MUL_DONE:
+    MOVE in1 acc
+    STORE 3
+
+###### NEGATE METHOD ######
+NEGATE:
+    LOADIN 1 0
+    STORE 1
+    JUMPC <= NEGATE_POS
+    SUB 1
+    SUB 1
+    STOREIN 1 0
+    JUMP CALL_RETURN
+NEGATE_POS:
+    
