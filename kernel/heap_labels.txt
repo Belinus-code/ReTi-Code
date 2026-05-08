@@ -1,55 +1,110 @@
 JUMP PREPARE_STACK
 SETUP:
+
+# --- TEST 1: Zwei Blöcke allokieren ---
+# Block 1 (Größe 10)
 LOADI 1
-STORE 1026              # Store '1' to M(1026) -> Argument Count
-LOADI 5                 # <----- ARGUMENT n
-STORE 1030              # Store n to M(1030)
-LOADI *MALLOC              # Relative Distance to GGT Method (See Label Parser)
-STORE 1024              # Store Distance to GTT Method in M(1024)
+STORE 1026
+LOADI 10
+STORE 1030
+LOADI *MALLOC
+STORE 1024
 MOVE pc acc
-STORE 1025              # Store PC in M(1025) -> To calc Return and Method adress
-JUMP CALL               # Call 'Call-Method'
+STORE 1025
+JUMP CALL
+LOAD 1030
+STORE 10            # Adresse von Block 1 in M(10) merken
+PRINT 10            # Sollte 4098 sein (4096 + 2 Header)
+PRINT 4095          # Top-Pointer sollte nun auf 4096 stehen
+PRINT 4096          # Should be 13
 
-LOAD 1030               # Return Value is in same Place as first Arumgent
-STORE 1
-PRINT 1
-
+# Block 2 (Größe 5)
 LOADI 1
-STORE 1026              # Store '1' to M(1026) -> Argument Count
-LOADI 5                 # <----- ARGUMENT n
-STORE 1030              # Store n to M(1030)
-LOADI *MALLOC              # Relative Distance to MALLOC Method (See Label Parser)
-STORE 1024              # Store Distance to MALLOC Method in M(1024)
+STORE 1026
+LOADI 5
+STORE 1030
+LOADI *MALLOC
+STORE 1024
 MOVE pc acc
-STORE 1025              # Store PC in M(1025) -> To calc Return and Method adress
-JUMP CALL               # Call 'Call-Method'
+STORE 1025
+JUMP CALL
+LOAD 1030
+STORE 11           # Adresse von Block 2 in M(11) merken
+PRINT 11           # Sollte 4111 sein (4098 + 10 + 3)
+PRINT 4095         # Top-Pointer sollte nun auf 4109 stehen
+PRINT 4109          # Should be 8
 
-LOAD 1030               # Return Value is in same Place as first Arumgent
-STORE 2
-PRINT 2
-PRINT 4095
-
+# --- TEST 2: Lücke füllen ---
+# Wir geben Block 1 (M(10)) frei
 LOADI 1
-STORE 1026              # Store '1' to M(1026) -> Argument Count
-LOAD 2                  # <----- ARGUMENT n
-STORE 1030              # Store n to M(1030)
-LOADI *FREE             # Relative Distance to FREE Method (See Label Parser)
-STORE 1024              # Store Distance to FREE Method in M(1024)
+STORE 1026
+LOAD 10
+STORE 1030
+LOADI *FREE
+STORE 1024
 MOVE pc acc
-STORE 1025              # Store PC in M(1025) -> To calc Return and Method adress
-JUMP CALL               # Call 'Call-Method'
-PRINT 4095
+STORE 1025
+JUMP CALL
 
+# Jetzt allokieren wir einen neuen Block 3 (Größe 3)
+# Dieser sollte in die Lücke von Block 1 (Größe 10) passen
 LOADI 1
-STORE 1026              # Store '1' to M(1026) -> Argument Count
-LOAD 1                  # <----- ARGUMENT n
-STORE 1030              # Store n to M(1030)
-LOADI *FREE             # Relative Distance to GGT Method (See Label Parser)
-STORE 1024              # Store Distance to GTT Method in M(1024)
+STORE 1026
+LOADI 3
+STORE 1030
+LOADI *MALLOC
+STORE 1024
 MOVE pc acc
-STORE 1025              # Store PC in M(1025) -> To calc Return and Method adress
-JUMP CALL               # Call 'Call-Method'
-PRINT 4095
+STORE 1025
+JUMP CALL
+LOAD 1030
+PRINT 1030         # Sollte wieder 4098 sein (Reuse!)
+# Zwischen Block 3 (ehemals 1) und Block 2 sollte automatisch ein neuer Block, Block 4, enstannten sein.
+PRINT 4096          # Should be 6
+PRINT 4102          # Should be 7 (13 - 6 = 7)
+
+# Jetzt allokieren wir einen neuen Block 4 (Größe 2)
+# Dieser sollte in die Lücke von Block 4 (Größe 10) passen
+LOADI 1
+STORE 1026
+LOADI 2
+STORE 1030
+LOADI *MALLOC
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+LOAD 1030
+PRINT 1030         # Sollte wieder 4104 sein (Reuse split Block)
+
+# --- TEST 3: Top-Pointer schrumpfen ---
+# Wir geben den aktuell letzten Block (Block 2 aus M(11)) frei
+LOADI 1
+STORE 1026
+LOADI 4104          # Free Block 4
+STORE 1030
+LOADI *FREE
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+
+PRINT 4095         # Heap Top Pointer shouldtn change
+
+
+# Wir geben Block 3 frei (letzter Block)
+LOADI 1
+STORE 1026
+LOADI 4111         # Adresse von Block 2
+STORE 1030
+LOADI *FREE
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+
+PRINT 4095         # Sollte nun wieder 4096 sein (Heap ist komplett leer)
+                    # Free sollte Block 4 (unused) mit Block 2 zusammen gefused und dann freigegeben haben
 
 JUMP END
 
@@ -159,15 +214,15 @@ MALLOC_GO_NEXT:
 MALLOC_FOUND:
     # If found but not at heap end, check if not last block before end
     # Check if block could be splitt in two, second block would need 4
-    # Right now Data_len of current block is in acc
-    SUBI 3
-    JUMPC > MALLOC_ALLOC    # If no Jump then split block
-    LAODIN 1 0
+    # Right now Data_len_old - Data_len_needed of current block is in acc
+    SUBI 3                  # Overhead of split frame would need 3
+    JUMPC < MALLOC_ALLOC    # If no Jump then split block
+    LOADIN 1 0
     STORE 3                 # Store original Frame Size in M(3)
     LOAD 1
-    ADD 3
+    ADDI 3
     STOREIN 1 0             # Change Frame Size to new Size
-    LOAD 2                  # Save new Frame Size
+    STORE 2                 # Save new Frame Size
     LOADI 1
     STOREIN 1 1             # Mark Frame as used
 
@@ -185,22 +240,25 @@ MALLOC_FOUND:
     # Check if this Block is last Block before Top of Heap
     MOVE in1 acc
     SUB 4095
-    JUMPC <= MALLOC_FINISH   # Zero if this is last block. If negative, smth went wrong
+    JUMPC >= MALLOC_FINISH   # Zero if this is last block. If positive, smth went wrong
 
     # Now create split Block after this one
     LOADIN 1 0              # New Frame Size
     STORE 2
     MOVE in1 acc
     ADD 2
-    MOVE acc in1            # Point to new split Frame
+    MOVE acc in1            # Points to new split Frame
     LOADI 0
     STOREIN 1 1             # Mark as unused
     # Calculate split Block size
     LOAD 3                  # Original Block Size
     SUBI 3
     SUB 1                   
+    STORE 6
+    PRINT 3
     STOREIN 1 0             # Store split block size
     STORE 3
+    
     # Store split Block size at end of split Frame
     MOVE in1 acc
     ADD 3                   # Points to next Frame
@@ -279,6 +337,8 @@ FREE:
     MOVE acc in1                # Jump to end of fused Frame
     LOAD 2
     STOREIN 1 -1                # Update Frame Length at end of Frame
+
+FREE_CHECK_UNDER:
     MOVE in1 acc
     SUB 2
     MOVE acc in1                # Restore Pointer to Frame
@@ -286,7 +346,6 @@ FREE:
     SUBI 4096
     JUMPC <= RETURN
 
-FREE_CHECK_UNDER:
     LOADIN 1 -1
     STORE 3
     MOVE in1 acc
