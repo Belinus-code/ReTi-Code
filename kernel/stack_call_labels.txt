@@ -1,0 +1,140 @@
+###### CALL METHOD ######
+CALL:
+    # 1. Save IN1 to Stack
+    MOVE in1 acc
+    STOREIN 2 0             # Dont Increse Stack now to save code
+
+    # 2. Save M(0) to M(4) to stack
+    LOAD 0
+    STOREIN 2 1             # Manuell Increment of Stack to save Code
+    LOAD 1
+    STOREIN 2 2
+    LOAD 2
+    STOREIN 2 3
+    LOAD 3
+    STOREIN 2 4
+    LOAD 4
+    STOREIN 2 5             # Stack +6
+
+    # 3. Copy n Arguments to stack
+    LOADI 0
+    STORE 1027              # Use 1027 as loop counter (i)
+CALL_COPY_ARG_LOOP:
+    LOAD 1026               # Load arg count (n)
+    SUB 1027
+    JUMPC <= CALL_ARGS_DONE # If i >= n, continue
+    LOADI 1030
+    ADD 1027                # Address: 1030 + i
+    MOVE acc in1
+    LOADIN 1 0              # Load argument from transfer area
+    STOREIN 2 6             # Push to stack
+    MOVE in2 acc            # Increment stack pointer
+    ADDI 1
+    MOVE acc in2
+    LOAD 1027               # Increment loop counter
+    ADDI 1
+    STORE 1027
+    JUMP CALL_COPY_ARG_LOOP
+
+# 4. Save Amount of Args (n) to Stack
+CALL_ARGS_DONE:
+    LOAD 1026               # M (1026) is arg count
+    STOREIN 2 6
+
+    # 5. Save Absolute Return Address to Stack (PC_ref + 3)
+    LOAD 1025
+    ADDI 3                  # Copying PC to M(1025) must be third last instruction
+    STOREIN 2 7
+    MOVE in2 acc
+    ADDI 8                  # finally update Stack-Pointer
+    MOVE acc in2
+
+    # 6. Save Adress of first Argument to M(0), just for QOL
+    SUBI 2                  # Stack-Counter - 2 Points to arg_count
+    SUB 1026                # Now points to first Argument
+    MOVE acc in1
+    STORE 0
+
+    # 7. Jump to Absolute Method Address (Offset + PC_ref - 2)
+    LOAD 1025
+    ADD 1024
+    SUBI 2
+    MOVE acc pc
+
+###### RETURN METHOD ######
+# Not as much comments because same as call just reverse
+RETURN:
+    # 1. Pop Return Address to M(1024)
+    LOADIN 2 -1             # Pop from stack
+    STORE 1024
+
+    # 2. Pop Arg count to M(1026)
+    LOADIN 2 -2
+    STORE 1026
+
+    CALL_PREP_ARG_RETURN:
+    # 3. Pop Arguments from Stack to M(1030)...
+    LOADI 1030
+    ADD 1026
+    SUBI 1
+    STORE 1025              # Target pointer
+
+RETURN_ARG_LOOP:
+    LOAD 1026
+    JUMPC <= CALL_RESOTRE_REGS
+    SUBI 1
+    STORE 1026
+    LOAD 1025
+    MOVE acc in1
+    MOVE in2 acc            # Decrement stack pointer (Pop)
+    SUBI 1
+    MOVE acc in2
+    LOADIN 2 -2
+    STOREIN 1 0             # Store return value back to transfer area
+    LOAD 1025
+    SUBI 1
+    STORE 1025
+    JUMP RETURN_ARG_LOOP
+
+# 4. Restore M(4) down to M(0) (Reverse order)
+CALL_RESOTRE_REGS:
+    LOADIN 2 -3
+    STORE 4
+    LOADIN 2 -4
+    STORE 3
+    LOADIN 2 -5
+    STORE 2
+    LOADIN 2 -6
+    STORE 1
+    LOADIN 2 -7
+    STORE 0
+
+    # 5. Pop IN1 Pointer to IN1
+    LOADIN 2 -8
+    MOVE acc in1
+
+    MOVE in2 acc
+    SUBI 8
+    MOVE acc in2
+
+    # 6. Final Jump back to main program
+    LOAD 1024
+    MOVE acc pc
+
+###### PREPARE STACK ######
+PREPARE_STACK:
+    # Prepare Stack
+    LOADI 2048              # Stack beginns at 2048
+    MOVE acc in2            # IN2 is always Stackpointer
+    LOADI 4095
+    STORE 4095              # Store Heap Top Pointer
+
+    # Fill M(0) to M(4) and IN1 with data (Otherwise Python error)
+    LOADI 0
+    STORE 0
+    STORE 1
+    STORE 2
+    STORE 3
+    STORE 4
+    MOVE acc in1
+    JUMP SETUP
