@@ -1,5 +1,7 @@
 JUMP PREPARE_STACK
 SETUP:
+JUMP ASCII_SETUP
+ASCII_SETUP_RETURN:
 
 # --- SETUP ---
 LOADI 4095
@@ -64,20 +66,40 @@ STOREIN 2 -1            # Update Base_ptr. not longer needed.
 LOAD 2                  # Gap Start
 ADD 7
 STORE 2                 # Update Gap Start
-LOAD 3                  # Gap Ende
+LOAD 3                  # Gap End of old heap block
 ADD 7
-STORE 3                 # Update Gap Ende
+STORE 3                 # Update Gap Ende (before copy)
 LOAD 4                  # Base Ende
 ADD 7
 STORE 8                 # Store old Base End pointer
 ADD 6                   # Add size increase
 STORE 4                 # Update Base End ptr 
+STORE 10                # Copy Register for copy loop
 
 
+COPY_LOOP:
+LOAD 8
+SUB 3
+JUMPC = COPY_LOOP_DONE
+LOAD 8
+MOVE ACC IN1
+LOADIN 1 0
+STORE 9
+MOVE IN1 ACC
+SUBI 1
+STORE 8
+LOAD 10
+MOVE ACC IN1
+LOAD 9
+STOREIN 1 0
+MOVE IN1 ACC
+SUBI 1
+STORE 10
+JUMP COPY_LOOP
 
-
-
-
+COPY_LOOP_DONE:
+LOAD 10
+STORE 3                  # Update Gap End ptr
 
 READ_NEXT_CHAR:
 READ 0
@@ -87,17 +109,14 @@ JUMPC = END
 LOAD 0
 SUBI 13
 JUMPC != CON_ENTER
-LOADI 10                # If pressed Enter, need to print 10 (Newline) instead of 13 (carry return)
-STORE 0
-PRINTC 0
-LOADIN 2 -1             # Load Heap Pointer
-ADD 2
+PRINTC 110              # If pressed Enter, need to print 10 (Newline) instead of 13 (carry return)
+LOAD 2                  # Load gap_start
 MOVE ACC IN1
-LOADI 10                # Store Newline in Heap
+LOAD 110                # Store Newline in Heap
 STOREIN 1 0
 LOAD 2
 ADDI 1
-STORE 2                 # Update Counter Value
+STORE 2                 # Update gap_start
 JUMP LOOP
 
 CON_ENTER:
@@ -106,52 +125,52 @@ SUBI 8
 JUMPC != CON_RETURN
 # BACKSPACE
 PRINTC 0
-LOADI 32
-STORE 1
-PRINTC 1
+PRINTC 132
 PRINTC 0
 
 LOAD 2
 SUBI 1
 STORE 2                 # Update Counter Value
+MOVE ACC IN1
+LOAD 132
+STOREIN 1 0
 JUMP LOOP
 
 CON_RETURN:
 LOAD 0
 SUBI 57419
 JUMPC != CON_ARLEFT
-# Arrow upwards sequence
-LOADI 27
-STORE 1
-PRINTC 1
-LOADI 91
-STORE 1
-PRINTC 1
-LOADI 49
-STORE 1
-PRINTC 1
-LOADI 68
-STORE 1
-PRINTC 1
+# Arrow left sequence
+PRINTC 127
+PRINTC 191
+PRINTC 149
+PRINTC 168
+# Move Gap in Base
+LOAD 2
+MOVE ACC IN1
+LOADIN 1 0
+STORE 5
+LOAD 2
+SUBI 1
+STORE 2
+LOAD 3
+MOVE ACC IN1
+LOAD 5
+STOREIN 1 0
+LOAD 3
+SUBI 1
+STORE 3
 JUMP LOOP
 
 CON_ARLEFT:
 LOAD 0
 SUBI 57421
 JUMPC != CON_ARRIGHT
-# Arrow upwards sequence
-LOADI 27
-STORE 1
-PRINTC 1
-LOADI 91
-STORE 1
-PRINTC 1
-LOADI 49
-STORE 1
-PRINTC 1
-LOADI 67
-STORE 1
-PRINTC 1
+# Arrow right sequence
+PRINTC 127
+PRINTC 191
+PRINTC 149
+PRINTC 167
 JUMP LOOP
 
 CON_ARRIGHT:
@@ -216,3 +235,4 @@ JUMP 0
 
 #include "stack_call_labels.txt"
 #include "malloc_labels.txt"
+#include "ascii_labels.txt"

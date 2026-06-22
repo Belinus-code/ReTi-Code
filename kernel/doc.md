@@ -73,3 +73,7 @@
 
 ### CALLOC(n)
 Same as Malloc(n) but filles complete Block with zeros.
+
+# Strings
+- For easy Print, every Ascii Character is stored in M(<char value> + 100)
+    - E.g.: a = M(197) because ord(a) = 97 -> 97 + 100 = 197
