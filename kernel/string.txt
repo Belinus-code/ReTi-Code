@@ -4,182 +4,180 @@ JUMP 226
 LOADI 4095
 STORE 4095             # Initialisiere leeren Heap
 
-# --- PHASE 1: Drei Blöcke allokieren ---
-# Block A (n=10)
-LOADI 1
-STORE 1026
-LOADI 10
-STORE 1030
-LOADI 556
-STORE 1024
-MOVE pc acc
-STORE 1025
-JUMP 130
-LOAD 1030
-STORE 10               # M(10) = 4098 (Pointer A)
-PRINT 10
-
-# Block B (n=10)
-LOADI 1
-STORE 1026
-LOADI 10
-STORE 1030
-LOADI 544
-STORE 1024
-MOVE pc acc
-STORE 1025
-JUMP 118
-LOAD 1030
-STORE 11               # M(11) = 4111 (Pointer B)
-PRINT 11
-
-# Block C (n=5) als "Stopper" am Ende
-LOADI 1
-STORE 1026
-LOADI 5
-STORE 1030
-LOADI 532
-STORE 1024
-MOVE pc acc
-STORE 1025
-JUMP 106
-LOAD 1030
-STORE 12               # M(12) = 4124 (Pointer C)
-PRINT 12
-
-# --- PHASE 2: Internes Shrinking (mit Split) ---
-# Wir verkleinern Block A auf n=2. Da Block B dahinter liegt,
-# muss ein Split-Block entstehen.
-LOADI 2
-STORE 1026
-LOAD 10
-STORE 1030
-LOADI 2
-STORE 1031
-LOADI 351
-STORE 1024
-MOVE pc acc
-STORE 1025
-JUMP 92
-
-PRINT 4096             # Header A: Sollte 5 sein (2+3)
-PRINT 4101             # Header Split-Block: Sollte 8 sein (13-5)
-PRINT 4102             # Status Split-Block: Sollte 0 (unused) sein
-
-# --- PHASE 3: Shrinking am Ende (ohne Split) ---
-# Wir verkleinern den Stopper-Block C.
-# Hier darf KEIN Split-Block entstehen.
-LOADI 2
-STORE 1026
-LOAD 12
-STORE 1030
-LOADI 1
-STORE 1031
-LOADI 337
-STORE 1024
-MOVE pc acc
-STORE 1025
-JUMP 78
-
-PRINT 4122             # Header C: Sollte 4 sein (1+3)
-# Prüfe, ob danach kein Header existiert (Heap-Ende)
-PRINT 4095             # Top-Pointer: Muss immer noch 4122 sein
-
-# --- PHASE 4: In-Place Expansion (Fusion) ---
-# Wir vergrößern Block A wieder auf n=10.
-# Er sollte den freien Split-Block von vorhin schlucken.
-LOADI 2
-STORE 1026
-LOAD 10
-STORE 1030
-LOADI 10
-STORE 1031
-LOADI 324
-STORE 1024
-MOVE pc acc
-STORE 1025
-JUMP 65
-
-PRINT 1030             # Pointer A: Muss immer noch 4098 sein
-PRINT 4096             # Header A: Sollte wieder 13 sein
-
-# --- PHASE 5: Relocation (Umzug) ---
-# Wir vergrößern A auf n=30. B versperrt den Weg.
-# A muss hinter C umziehen.
-LOADI 2
-STORE 1026
-LOAD 10
-STORE 1030
-LOADI 30
-STORE 1031
-LOADI 311
-STORE 1024
-MOVE pc acc
-STORE 1025
-JUMP 52
-
-LOAD 1030
-STORE 13               # Neuen Pointer A in M(13) merken
-PRINT 13               # Sollte > 4126 sein
-# Check ob alter Platz frei ist
-
-PRINT 4097             # Status bei 4097: Sollte 0 (free) sein
-
-JUMP 1
-
-###### END ######
-JUMP 0
-
-###### MIN METHOD ######
-LOADIN 1 0              # IN1 is Frame-Pointer because Call Method puts it there
-STORE 1                 # x is now at M(1)
-LOADIN 1 1
-SUB 1                   # y - x
-JUMPC >= 86        # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
-LOADIN 1 1
-STOREIN 1 0             # Store y in ReturnValue Adress
-JUMP 83
-
-###### MAX METHOD ######
-LOADIN 1 0
-STORE 1                 # x is now at M(1)
-LOADIN 1 1
-SUB 1                   # y - x
-JUMPC <= 78        # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
-LOADIN 1 1
-STOREIN 1 0             # Store y in ReturnValue Adress
-JUMP 75
-
-###### MUL METHOD ######
-LOADIN 1 1
-STORE 2             # y Value
-JUMPC >= 4
 LOADI 0
-SUB 2
-STORE 2             # If y<0 negate y
-LOADIN 1 0
-STORE 1
-LOADIN 1 1
-JUMPC = 65          # if x is zero, zero is in return_adr, so return
-JUMPC >= 4
-LOADI 0
-SUB 1
-STORE 1
-LOADI 0             # Start with Zero
-STORE 3
-LOAD 2
-JUMPC <= 7
-SUBI 1
-STORE 2
+STORE 2                 # Counter for amount of chars in String
+STORE 4                 # Pointer for Cursor. Points to next cell to be written to
+LOADI 20
+STORE 3                 # Space in Heap Block
+
+
+LOADI 1
+STORE 1026
+LOAD 3                  # Default String Size in M(3)
+STORE 1030
+LOADI 551
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP 125
+LOAD 1030
+STOREIN 2 0             # Store Pointer to String on Stack
+MOVE ACC IN1            # Also put into IN1
+MOVE IN2 ACC
+ADDI 1
+MOVE ACC IN2
+
+
+LOAD 3                  # Heap Block Size
+SUB 2                   # Amount of chars
+SUBI 1                  # Because of Zero Terminator
+JUMPC > 18
 LOAD 3
-ADD 1
+ADDI 10                 # Resize new heap to +10 cells
 STORE 3
-JUMP -7
+
+# Realloc new Block
+LOADI 2                 # 2 Arguments
+STORE 1026
+LOADIN 2 -1             # Load Heap pointer
+STORE 1030              # Heap Pointer to Args
+LOAD 3                  # Heap Block Size in M(3)
+STORE 1031              # Current Heap Block Size to Args
+LOADI 360
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP 101
+LOAD 1030
+STOREIN 2 -1            # Store Pointer to String on Stack
+MOVE ACC IN1            # Also put into IN1
+
+
+READ 0
+STORE 0
+SUBI 27
+JUMPC = 70
 LOAD 0
-MOVE acc in1
-LOAD 3
+SUBI 13
+JUMPC != 13
+LOADI 10                # If pressed Enter, need to print 10 (Newline) instead of 13 (carry return)
+STORE 0
+PRINTC 0
+LOADIN 2 -1             # Load Heap Pointer
+ADD 2
+MOVE ACC IN1
+LOADI 10                # Store Newline in Heap
 STOREIN 1 0
-JUMP 46
+LOAD 2
+ADDI 1
+STORE 2                 # Update Counter Value
+JUMP -39
+
+LOAD 0
+SUBI 8
+JUMPC != 10
+# BACKSPACE
+PRINTC 0
+LOADI 32
+STORE 1
+PRINTC 1
+PRINTC 0
+
+LOAD 2
+SUBI 1
+STORE 2                 # Update Counter Value
+JUMP -51
+
+LOAD 0
+SUBI 57419
+JUMPC != 14
+# Arrow upwards sequence
+LOADI 27
+STORE 1
+PRINTC 1
+LOADI 91
+STORE 1
+PRINTC 1
+LOADI 49
+STORE 1
+PRINTC 1
+LOADI 68
+STORE 1
+PRINTC 1
+JUMP -67
+
+LOAD 0
+SUBI 57421
+JUMPC != 14
+# Arrow upwards sequence
+LOADI 27
+STORE 1
+PRINTC 1
+LOADI 91
+STORE 1
+PRINTC 1
+LOADI 49
+STORE 1
+PRINTC 1
+LOADI 67
+STORE 1
+PRINTC 1
+JUMP -83
+
+# Normal Char
+PRINTC 0                # Print char to screen
+
+# Now Save char in Heap
+LOADIN 2 -1
+ADD 2
+MOVE ACC IN1
+LOAD 0
+STOREIN 1 0
+
+LOAD 2
+ADDI 1
+STORE 2                 # Update Counter Value
+JUMP -93
+
+LOADIN 2 -1
+ADD 2
+MOVE ACC IN1
+LOADI 0
+
+STOREIN 1 0             # Store Zero Terminator
+
+LOADIN 2 -1
+STORE 0
+
+LOAD 0             # Lade den Start-Pointer aus M(0)
+MOVE acc in1       # Kopiere ihn nach IN1 (unser Basis-Register)
+
+LOADIN 1 0         # Lädt M(IN1 + M(1)) -> Also das aktuelle Zeichen
+STORE 2            # Sichere das Zeichen kurz in M(2)
+
+# Prüfe auf den Null-Terminator (\0)
+JUMPC = 6           # Wenn ACC == 0 ist, sind wir am Ende des Strings!
+
+# Zeichen ausgeben
+PRINTC 2           # Printe das Zeichen aus M(2)
+
+# Offset erhöhen für das nächste Zeichen
+MOVE IN1 ACC
+ADDI 1
+MOVE ACC IN1
+
+JUMP -7            # Nächster Schleifendurchlauf
+
+# Hier geht es weiter, wenn der String komplett gedruckt wurde
+# z.B. einen Zeilenumbruch hinterherjagen:
+LOADI 13
+STORE 2
+PRINTC 2
+LOADI 10
+STORE 2
+PRINTC 2
+
+JUMP 0
 
 ###### CALL METHOD ######
 # 1. Save IN1 to Stack

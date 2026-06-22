@@ -1,0 +1,218 @@
+JUMP PREPARE_STACK
+SETUP:
+
+# --- SETUP ---
+LOADI 4095
+STORE 4095             # Initialisiere leeren Heap
+
+LOADI 1
+STORE 1026
+LOADI 32               # Alloc 32 Cells for Beginning
+STORE 1030
+LOADI *CALLOC
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+LOAD 1030
+STOREIN 2 0             # Store Pointer to String on Stack (BASE_PTR)
+STORE 2                 # M(2) Is GAP_START (On start equal to BASE_PTR)
+ADDI 31                 # Block size -1
+STORE 3                 # M(3) is GAP_END
+STORE 4                 # M(4) is BASE_END
+MOVE IN2 ACC
+ADDI 1
+MOVE ACC IN2            # Update Stack Pointer
+
+
+LOOP:
+LOAD 3                  # GAP_END
+SUB 2                   # - GAP_START
+JUMPC > READ_NEXT_CHAR
+LOAD 3
+ADDI 10                 # Resize new heap to +10 cells
+STORE 3
+
+# Realloc new Block
+LOADI 10
+STORE 6                 # Amount to resize new BASE
+LOADI 2                 # 2 Arguments
+STORE 1026
+LOADIN 2 -1             # Load Heap pointer
+STORE 5                 # Keep old Pointer on M(5) for Reference calculation
+STORE 1030              # Heap Pointer to Args
+LOAD 4                  # BASE_END
+SUB 5                   # - BASE_PTR
+ADDI 1                  # Current BASE Size
+ADD 6                   # Increase size by M(6)
+STORE 1031              # New Base Size to Args
+LOADI *REALLOC
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+LOAD 1030
+STOREIN 2 -1            # Store Pointer to String on Stack
+STORE 8
+# New Block realloced, now gotta move everything behind cursor after GAP_END
+
+LOAD 8
+SUB 5                   # This is offset from old to new Base
+STORE 7
+LOAD 8
+STOREIN 2 -1            # Update Base_ptr. not longer needed.
+LOAD 2                  # Gap Start
+ADD 7
+STORE 2                 # Update Gap Start
+LOAD 3                  # Gap Ende
+ADD 7
+STORE 3                 # Update Gap Ende
+LOAD 4                  # Base Ende
+ADD 7
+STORE 8                 # Store old Base End pointer
+ADD 6                   # Add size increase
+STORE 4                 # Update Base End ptr 
+
+
+
+
+
+
+
+READ_NEXT_CHAR:
+READ 0
+STORE 0
+SUBI 27
+JUMPC = END
+LOAD 0
+SUBI 13
+JUMPC != CON_ENTER
+LOADI 10                # If pressed Enter, need to print 10 (Newline) instead of 13 (carry return)
+STORE 0
+PRINTC 0
+LOADIN 2 -1             # Load Heap Pointer
+ADD 2
+MOVE ACC IN1
+LOADI 10                # Store Newline in Heap
+STOREIN 1 0
+LOAD 2
+ADDI 1
+STORE 2                 # Update Counter Value
+JUMP LOOP
+
+CON_ENTER:
+LOAD 0
+SUBI 8
+JUMPC != CON_RETURN
+# BACKSPACE
+PRINTC 0
+LOADI 32
+STORE 1
+PRINTC 1
+PRINTC 0
+
+LOAD 2
+SUBI 1
+STORE 2                 # Update Counter Value
+JUMP LOOP
+
+CON_RETURN:
+LOAD 0
+SUBI 57419
+JUMPC != CON_ARLEFT
+# Arrow upwards sequence
+LOADI 27
+STORE 1
+PRINTC 1
+LOADI 91
+STORE 1
+PRINTC 1
+LOADI 49
+STORE 1
+PRINTC 1
+LOADI 68
+STORE 1
+PRINTC 1
+JUMP LOOP
+
+CON_ARLEFT:
+LOAD 0
+SUBI 57421
+JUMPC != CON_ARRIGHT
+# Arrow upwards sequence
+LOADI 27
+STORE 1
+PRINTC 1
+LOADI 91
+STORE 1
+PRINTC 1
+LOADI 49
+STORE 1
+PRINTC 1
+LOADI 67
+STORE 1
+PRINTC 1
+JUMP LOOP
+
+CON_ARRIGHT:
+# Normal Char
+PRINTC 0                # Print char to screen
+
+# Now Save char in Heap
+LOADIN 2 -1
+ADD 2
+MOVE ACC IN1
+LOAD 0
+STOREIN 1 0
+
+LOAD 2
+ADDI 1
+STORE 2                 # Update Counter Value
+JUMP LOOP
+
+END:
+LOADIN 2 -1
+ADD 2
+MOVE ACC IN1
+LOADI 0
+
+STOREIN 1 0             # Store Zero Terminator
+
+LOADIN 2 -1
+STORE 0
+
+PRINT_STRING:
+    LOAD 0             # Lade den Start-Pointer aus M(0)
+    MOVE acc in1       # Kopiere ihn nach IN1 (unser Basis-Register)
+
+STRING_LOOP:
+    LOADIN 1 0         # Lädt M(IN1 + M(1)) -> Also das aktuelle Zeichen
+    STORE 2            # Sichere das Zeichen kurz in M(2)
+    
+    # Prüfe auf den Null-Terminator (\0)
+    JUMPC = STRING_DONE # Wenn ACC == 0 ist, sind wir am Ende des Strings!
+
+    # Zeichen ausgeben
+    PRINTC 2           # Printe das Zeichen aus M(2)
+
+    # Offset erhöhen für das nächste Zeichen
+    MOVE IN1 ACC
+    ADDI 1
+    MOVE ACC IN1
+    
+    JUMP STRING_LOOP   # Nächster Schleifendurchlauf
+
+STRING_DONE:
+    # Hier geht es weiter, wenn der String komplett gedruckt wurde
+    # z.B. einen Zeilenumbruch hinterherjagen:
+    LOADI 13
+    STORE 2
+    PRINTC 2
+    LOADI 10
+    STORE 2
+    PRINTC 2
+
+JUMP 0
+
+#include "stack_call_labels.txt"
+#include "malloc_labels.txt"

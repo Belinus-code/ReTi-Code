@@ -124,7 +124,6 @@ STORE 13               # Neuen Pointer A in M(13) merken
 PRINT 13               # Sollte > 4126 sein
 # Check ob alter Platz frei ist
 PRINT 4097             # Status bei 4097: Sollte 0 (free) sein
-
 JUMP END
 
 ###### END ######

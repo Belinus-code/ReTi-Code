@@ -35,7 +35,7 @@
 - Heap grows upwards
 
 ### MALLOC(n)
-- Starts at M(4096)
+- Argument 1: Size of requested Block
 - Checks every Frame if usable:
     - resize if needed/possible. If between new frame and next frame is less than 4 cells, no need to resize because every Frame needs at least 4 cells
     - if resize usefull, resize this frame, create new unused frame between new and next frame
@@ -43,12 +43,15 @@
 
 
 ### FREE(pointer)
+- Argument 1: Heap-Pointer to Data (not header block!)
 - Sets Block to unused
 - Updates Top Heap Pointer if this is last Block
 - Checks if Block after this Block is used, if not, fuse (add block lengths together)
 - Checks if Block before this Block is used, if not, fuse with this
 
 ### REALLOC(pointer, n)
+- Argument 1: Heap-Pointer to Data (not header block!)
+- Argument 2: Wanted Data Size of new Heap Block
 - Checks for Shrinking
     - Check is Splitt is possible, do so if possible
     - If not, dont change anything
@@ -67,3 +70,6 @@
     - Malloc new Frame
     - Copy old Frame
     - Return new Pointer
+
+### CALLOC(n)
+Same as Malloc(n) but filles complete Block with zeros.
