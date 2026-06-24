@@ -211,6 +211,10 @@ JUMP LOOP
 ARRLEFT_LINEUP:
 PRINTC 127
 PRINTC 177               # Sequence to move cursor up one line and move screen down if needed
+PRINTC 127              # ESC (27 + 100)
+PRINTC 191              # [ (91 + 100)
+PRINTC 175              # K (75 + 100)  Sequence to clear to end of line
+JUMP REPRINT_LINE
 # Now gotta move cursor to last char in this line
 LOAD 2
 SUBI 1
@@ -330,13 +334,39 @@ JUMP UPDATE_INLINE_PLOOP_DONE
 
 # Prints the complete line. M(Gap_start -1) must be at last char of line
 REPRINT_LINE:
-LOAD 3                  # GAP_END (last free cell)
-ADDI 1
+LOAD 2                  # GAP_start (last occupied cell)
+SUBI 1
 STORE 6                 # print_ptr
 
+REPRINT_LINE_LOOPBACK:
 LOAD 6
+MOVE ACC IN1
 SUB 1
+JUMPC <= REPRINT_LINE_ATBACK
+LOADIN 1 0
+SUB 110                 # Check if char is newline
+JUMPC = REPRINT_LINE_ATBACK_NL
+MOVE IN1 ACC
+SUBI 1
+STORE 6
+JUMP REPRINT_LINE_LOOPBACK
 
+REPRINT_LINE_ATBACK_NL:
+LOAD 6
+ADDI 1
+STORE 6
+REPRINT_LINE_ATBACK:
+LOAD 6
+MOVE ACC IN1
+SUB 2                   # Subtract gap_start
+JUMPC >= LOOP
+LOADIN 1 0
+STORE 5
+PRINTC 5
+MOVE IN1 ACC
+ADDI 1
+STORE 6
+JUMP REPRINT_LINE_ATBACK
 
 ###### THIS IS AFTER INPUT ENDED ######
 
