@@ -16,6 +16,8 @@
 ### Arguments
 - Amount of Args are to be stored at M(1026)
 - All arguments are to be stored at M(1030) and following
+- Store relative offset to method in M(1024) (use label parser for offset)
+- Last thing before call must always be: MOVE PC ACC; STORE 1025; JUMP CALL
 - Call copys all arguments to stack automatically, Pointer to first Arg gets stored at M(0)
 - Return Values are to placed at same Place at Arguments where copied to on stack
 - Return Method will copy all Arguments (or Return values is placed there) from Stack to M(1030) and following

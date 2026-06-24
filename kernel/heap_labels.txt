@@ -190,3 +190,4 @@ MUL_DONE:
 
 #include "stack_call_labels.txt"
 #include "malloc_labels.txt"
+#include "math_labels.txt"

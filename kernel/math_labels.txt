@@ -1,0 +1,57 @@
+###### MIN METHOD ######
+MIN:
+    LOADIN 1 0              # IN1 is Frame-Pointer because Call Method puts it there
+    STORE 1                 # x is now at M(1)
+    LOADIN 1 1
+    SUB 1                   # y - x
+    JUMPC >= RETURN    # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
+    LOADIN 1 1
+    STOREIN 1 0             # Store y in ReturnValue Adress
+    JUMP RETURN
+
+###### MAX METHOD ######
+MAX:
+    LOADIN 1 0
+    STORE 1                 # x is now at M(1)
+    LOADIN 1 1
+    SUB 1                   # y - x
+    JUMPC <= RETURN    # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
+    LOADIN 1 1
+    STOREIN 1 0             # Store y in ReturnValue Adress
+    JUMP RETURN
+
+###### MUL METHOD ######
+MUL:
+    LOADIN 1 1
+    STORE 2             # y Value
+    JUMPC >= MULCHECKX
+    LOADI 0
+    SUB 2
+    STORE 2             # If y<0 negate y
+MULCHECKX:
+    LOADIN 1 0
+    STORE 1
+    LOADIN 1 1
+    JUMPC = RETURN      # if x is zero, zero is in return_adr, so return
+    JUMPC >= MULSTART
+    LOADI 0
+    SUB 1
+    STORE 1
+MULSTART:
+    LOADI 0             # Start with Zero
+    STORE 3
+MUL_LOOP:
+    LOAD 2
+    JUMPC <= MUL_DONE
+    SUBI 1
+    STORE 2
+    LOAD 3
+    ADD 1
+    STORE 3
+    JUMP MUL_LOOP
+MUL_DONE:
+    LOAD 0
+    MOVE acc in1
+    LOAD 3
+    STOREIN 1 0
+    JUMP RETURN

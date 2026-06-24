@@ -1,16 +1,19 @@
-JUMP 426
-JUMP 792
+JUMP 537
+JUMP 903
+
+# --- SETUP ---
 LOADI 4095
 STORE 4095             # Initialisiere leeren Heap
+
 LOADI 1
 STORE 1026
 LOADI 32               # Alloc 32 Cells for Beginning
 STORE 1030
-LOADI 755
+LOADI 866
 STORE 1024
 MOVE pc acc
 STORE 1025
-JUMP 329
+JUMP 440
 LOAD 1030
 STOREIN 2 0             # Store Pointer to String on Stack (BASE_PTR)
 STORE 1
@@ -21,9 +24,26 @@ STORE 4                 # M(4) is BASE_END
 MOVE IN2 ACC
 ADDI 1
 MOVE ACC IN2            # Update Stack Pointer
+
+# switch to secondary monitor
+PRINTC 127
+PRINTC 191
+PRINTC 163
+PRINTC 149
+PRINTC 148
+PRINTC 152
+PRINTC 157
+PRINTC 204
+
+# please help me
+PRINTC 127
+PRINTC 191
+PRINTC 172
+
 LOAD 3                  # GAP_END
 SUB 2                   # - GAP_START
 JUMPC > 58
+# Realloc new Block
 LOADI 10
 STORE 6                 # Amount to resize new BASE
 LOADI 2                 # 2 Arguments
@@ -36,14 +56,16 @@ SUB 5                   # - BASE_PTR
 ADDI 1                  # Current BASE Size
 ADD 6                   # Increase size by M(6)
 STORE 1031              # New Base Size to Args
-LOADI 558
+LOADI 658
 STORE 1024
 MOVE pc acc
 STORE 1025
-JUMP 299
+JUMP 399
 LOAD 1030
 STOREIN 2 -1            # Store Pointer to String on Stack
 STORE 8
+# New Block realloced, now gotta move everything behind cursor after GAP_END
+
 LOAD 8
 SUB 5                   # This is offset from old to new Base
 STORE 7
@@ -61,6 +83,7 @@ STORE 8                 # Store old Base End pointer
 ADD 6                   # Add size increase
 STORE 4                 # Update Base End ptr
 STORE 10                # Copy Register for copy loop
+
 LOAD 8
 SUB 3
 JUMPC = 16
@@ -79,12 +102,14 @@ MOVE IN1 ACC
 SUBI 1
 STORE 10
 JUMP -17
+
 LOAD 10
 STORE 3                  # Update Gap End ptr
+
 READ 0
 STORE 0
 SUBI 27
-JUMPC = 214
+JUMPC = 208
 LOAD 0
 SUBI 13
 JUMPC != 23             # If pressed Enter, need to check if there is content behind cursor. But first save newline on heap
@@ -95,6 +120,7 @@ STOREIN 1 0
 LOAD 2
 ADDI 1
 STORE 2                 # Update gap_start
+
 LOAD 3
 SUB 4
 JUMPC != 4
@@ -110,9 +136,12 @@ PRINTC 127
 PRINTC 191
 PRINTC 176              # Insert new line (move this and all following lines one down)
 JUMP 127
+
+
 LOAD 0
 SUBI 8
 JUMPC != 35
+# BACKSPACE
 PRINTC 0
 PRINTC 132
 PRINTC 0
@@ -130,9 +159,11 @@ PRINTC 127
 PRINTC 191
 PRINTC 149
 PRINTC 165              # This sequence moves cursor line up (now is at beginning of line)
+# now move cursor to end of this line. need to count chars in line before gap_start
 LOAD 2
 SUBI 1
 STORE 5                 # check_ptr
+
 LOAD 5
 MOVE ACC IN1
 SUB 1                   # - Base_ptr
@@ -147,12 +178,16 @@ LOAD 5
 SUBI 1
 STORE 5
 JUMP -13
+
+
 LOAD 0
 SUBI 57419
 JUMPC != 48
+# Check if cursor to left is allowed
 LOADIN 2 -1             # Load Base_ptr
 SUB 2                   # Subtract gap_start. If zero than cursor already is on first index. Do Nothing
 JUMPC >= -71            # No need to check for resizing block, didn't touch block
+# Move Gap in Base
 LOAD 2
 SUBI 1
 MOVE ACC IN1
@@ -167,22 +202,27 @@ STOREIN 1 0
 LOAD 3
 SUBI 1
 STORE 3
+# Now check if cursor is at beginning of line. Moved character is in M(5)
 LOAD 5
 SUB 110                 # Zero if char was newline
 JUMPC = 5
+# Arrow left sequence
 PRINTC 127
 PRINTC 191
 PRINTC 168
 JUMP -152
+#If cursor was at beginning of line, gotta move up and to end
 PRINTC 127
 PRINTC 177               # Sequence to move cursor up one line and move screen down if needed
 PRINTC 127              # ESC (27 + 100)
 PRINTC 191              # [ (91 + 100)
 PRINTC 175              # K (75 + 100)  Sequence to clear to end of line
-JUMP 91
+JUMP 85
+# Now gotta move cursor to last char in this line
 LOAD 2
 SUBI 1
 STORE 5                 # check_ptr
+
 LOAD 5
 MOVE ACC IN1
 SUB 1                   # - Base_ptr
@@ -197,12 +237,16 @@ LOAD 5
 SUBI 1
 STORE 5
 JUMP -13
+
+
 LOAD 0
 SUBI 57421
 JUMPC != 28
+# Check if cursor to right is allowed
 LOAD 4                  # base_end
 SUB 3                   # Subtract gap_end. If zero than cursor already is on first index. Do Nothing
 JUMPC <= -121           # No need to check for resizing block, didn't touch block
+# Move Gap in Base
 LOAD 3
 ADDI 1
 MOVE ACC IN1
@@ -220,6 +264,7 @@ STORE 2
 LOAD 5                  # character that got moved over gap
 SUB 110                 # Check if moved character was newline
 JUMPC = 5
+# Arrow right sequence
 PRINTC 127
 PRINTC 191
 PRINTC 167
@@ -227,23 +272,34 @@ JUMP -202
 PRINTC 113
 PRINTC 110
 JUMP 10
+
+# Normal Char
 PRINTC 0                # Print char to screen
+# Now Save char in Heap
 LOAD 2                  # Gap_start ptr
 MOVE ACC IN1
 LOAD 0
 STOREIN 1 0
+
 LOAD 2
 ADDI 1
 STORE 2                 # Update Gap_start
 JUMP 1
-LOADI 0
-STORE 5                 # Counter for reseting cursor later
+
+# If editing is done in between characters, its nessesary to update the rest of the line
+# Status: character at gap_start-1 is already printed as it should be. Update needed at gap_end +1 to (base_end or newline)
+# Must set cursor to original position afterwards
+PRINTC 127
+PRINTC 155
 LOAD 3                  # GAP_END (last free cell)
 ADDI 1
 STORE 6                 # print_ptr
+
+# Send ESC [ K to clear the rest of the line before repainting
 PRINTC 127              # ESC (27 + 100)
 PRINTC 191              # [ (91 + 100)
 PRINTC 175              # K (75 + 100)
+
 LOAD 4
 SUB 6                   # base_end - print_ptr
 JUMPC < 15
@@ -261,18 +317,16 @@ LOAD 5
 ADDI 1
 STORE 5
 JUMP -16
-LOAD 5
-JUMPC <= -241
-SUBI 1
-STORE 5
+
 PRINTC 127
-PRINTC 191
-PRINTC 149
-PRINTC 168
-JUMP -8
+PRINTC 156
+JUMP -242
+
+# Prints the complete line. M(Gap_start -1) must be at last char of line
 LOAD 2                  # GAP_start (last occupied cell)
 SUBI 1
 STORE 6                 # print_ptr
+
 LOAD 6
 MOVE ACC IN1
 SUB 1
@@ -284,13 +338,14 @@ MOVE IN1 ACC
 SUBI 1
 STORE 6
 JUMP -10
+
 LOAD 6
 ADDI 1
 STORE 6
 LOAD 6
 MOVE ACC IN1
 SUB 2                   # Subtract gap_start
-JUMPC >= -269
+JUMPC >= -263
 LOADIN 1 0
 STORE 5
 PRINTC 5
@@ -298,6 +353,10 @@ MOVE IN1 ACC
 ADDI 1
 STORE 6
 JUMP -10
+
+###### THIS IS AFTER INPUT ENDED ######
+
+# Now get rid of gap in string in order to use it
 LOAD 4
 SUB 3
 JUMPC <= 16
@@ -316,31 +375,172 @@ LOAD 2
 ADDI 1
 STORE 2
 JUMP -17
+
 LOAD 2                  # Gap_start
 MOVE ACC IN1
 LOAD 100                # Zero Terminator
 STOREIN 1 0
+
+# switch to main monitor
+PRINTC 127
+PRINTC 191
+PRINTC 163
+PRINTC 149
+PRINTC 148
+PRINTC 152
+PRINTC 157
+PRINTC 208
+
+
+
 LOADIN 2 -1
 STORE 0
+
 LOAD 0             # Lade den Start-Pointer aus M(0)
 MOVE acc in1       # Kopiere ihn nach IN1 (unser Basis-Register)
+
 LOADIN 1 0         # Lädt M(IN1 + M(1)) -> Also das aktuelle Zeichen
 STORE 2            # Sichere das Zeichen kurz in M(2)
+
+# Prüfe auf den Null-Terminator (\0)
 JUMPC = 6           # Wenn ACC == 0 ist, sind wir am Ende des Strings!
+
+# Zeichen ausgeben
 PRINTC 2           # Printe das Zeichen aus M(2)
+
+# Offset erhöhen für das nächste Zeichen
 MOVE IN1 ACC
 ADDI 1
 MOVE ACC IN1
+
 JUMP -7            # Nächster Schleifendurchlauf
+
+# Hier geht es weiter, wenn der String komplett gedruckt wurde
+# z.B. einen Zeilenumbruch hinterherjagen:
 LOADI 13
 STORE 2
 PRINTC 2
 LOADI 10
 STORE 2
 PRINTC 2
+
+PRINTC 113
+PRINTC 110
+PRINTC 173
+PRINTC 158
+PRINTC 132
+
+LOADI 2                 # 2 Argument
+STORE 1026
+LOAD 0                  # Pointer to string
+STORE 1030              # Parse result to args
+LOADI 0
+STORE 1031
+LOADI 11
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP 84
+PRINT 1030
+PRINTC 179
+PRINTC 158
+PRINTC 132
+PRINT 1031
+
 JUMP 0
+
+###### ATOI METHOD ######
+LOADI 0
+STORE 4
+STORE 5
+LOADIN 1 0              # Pointer to String
+STORE 1
+LOADIN 2 -2
+STORE 2
+SUBI 1                  # If only one argument, then skip following
+JUMPC = 6
+LOADIN 1 1              # Load offset
+STORE 3
+LOAD 1
+ADD 3
+STORE 1
+
+LOAD 1
+MOVE ACC IN1
+LOADIN 1 0
+SUB 145                 # Ascii 145 (negative Value)
+STORE 3                 # M(3) is zero if first char is negative, != 0 if not
+JUMPC != 4
+LOAD 1
+ADDI 1
+STORE 1
+
+LOAD 1
+MOVE ACC IN1
+LOADIN 1 0
+SUBI 48
+STORE 2
+JUMPC < 21
+SUBI 9
+JUMPC > 19
+# Call multiply method and multiply old buffer by ten, then add number to buffer
+LOADI 2                 # 2 Arguments
+STORE 1026
+LOAD 4                  # Load Result of parser
+STORE 1030              # Parse result to args
+LOADI 10                # -1 to negate
+STORE 1031              # store -1 to args
+LOADI 519
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP 36
+LOAD 1030
+ADD 2
+STORE 4
+LOAD 1
+ADDI 1
+STORE 1
+JUMP -25
+
+
+LOAD 3
+JUMPC != 14             # Jump if no - found before number
+LOADI 2                 # 2 Arguments
+STORE 1026
+LOAD 4                  # Load Result of parser
+STORE 1030              # Parse result to args
+LOADI -1                # -1 to negate
+STORE 1031              # store -1 to args
+LOADI 499
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP 16
+LOAD 1030
+STORE 4
+
+LOAD 0
+MOVE ACC IN1
+LOADIN 2 -2
+SUBI 1
+JUMPC = 6
+LOADIN 1 0
+STORE 2
+LOAD 1
+SUB 2
+STOREIN 1 1
+LOAD 4
+STOREIN 1 0
+JUMP 46
+
+
+###### CALL METHOD ######
+# 1. Save IN1 to Stack
 MOVE in1 acc
 STOREIN 2 0             # Dont Increse Stack now to save code
+
+# 2. Save M(0) to M(4) to stack
 LOAD 0
 STOREIN 2 1             # Manuell Increment of Stack to save Code
 LOAD 1
@@ -351,6 +551,8 @@ LOAD 3
 STOREIN 2 4
 LOAD 4
 STOREIN 2 5             # Stack +6
+
+# 3. Copy n Arguments to stack
 LOADI 0
 STORE 1027              # Use 1027 as loop counter (i)
 LOAD 1026               # Load arg count (n)
@@ -368,30 +570,47 @@ LOAD 1027               # Increment loop counter
 ADDI 1
 STORE 1027
 JUMP -14
+
+# 4. Save Amount of Args (n) to Stack
 LOAD 1026               # M (1026) is arg count
 STOREIN 2 6
+
+# 5. Save Absolute Return Address to Stack (PC_ref + 3)
 LOAD 1025
 ADDI 3                  # Copying PC to M(1025) must be third last instruction
 STOREIN 2 7
 MOVE in2 acc
 ADDI 8                  # finally update Stack-Pointer
 MOVE acc in2
+
+# 6. Save Adress of first Argument to M(0), just for QOL
 SUBI 2                  # Stack-Counter - 2 Points to arg_count
 SUB 1026                # Now points to first Argument
 MOVE acc in1
 STORE 0
+
+# 7. Jump to Absolute Method Address (Offset + PC_ref - 2)
 LOAD 1025
 ADD 1024
 SUBI 2
 MOVE acc pc
+
+###### RETURN METHOD ######
+# Not as much comments because same as call just reverse
+# 1. Pop Return Address to M(1024)
 LOADIN 2 -1             # Pop from stack
 STORE 1024
+
+# 2. Pop Arg count to M(1026)
 LOADIN 2 -2
 STORE 1026
+
+# 3. Pop Arguments from Stack to M(1030)...
 LOADI 1030
 ADD 1026
 SUBI 1
 STORE 1025              # Target pointer
+
 LOAD 1026
 JUMPC <= 14
 SUBI 1
@@ -407,6 +626,8 @@ LOAD 1025
 SUBI 1
 STORE 1025
 JUMP -14
+
+# 4. Restore M(4) down to M(0) (Reverse order)
 LOADIN 2 -3
 STORE 4
 LOADIN 2 -4
@@ -417,17 +638,27 @@ LOADIN 2 -6
 STORE 1
 LOADIN 2 -7
 STORE 0
+
+# 5. Pop IN1 Pointer to IN1
 LOADIN 2 -8
 MOVE acc in1
+
 MOVE in2 acc
 SUBI 8
 MOVE acc in2
+
+# 6. Final Jump back to main program
 LOAD 1024
 MOVE acc pc
+
+###### PREPARE STACK ######
+# Prepare Stack
 LOADI 2048              # Stack beginns at 2048
 MOVE acc in2            # IN2 is always Stackpointer
 LOADI 4095
 STORE 4095              # Store Heap Top Pointer
+
+# Fill M(0) to M(4) and IN1 with data (Otherwise Python error)
 LOADI 0
 STORE 0
 STORE 1
@@ -435,7 +666,8 @@ STORE 2
 STORE 3
 STORE 4
 MOVE acc in1
-JUMP -436
+JUMP -547
+###### MALLOC METHOD ######
 LOADIN 1 0
 STORE 1                 # Size of to alloc memory
 LOADI 4096              # Points of first frame
@@ -455,6 +687,9 @@ MOVE in1 acc
 ADD 2                   # Frame Pointer + Frame Size
 MOVE acc in1            # Point to next Frame
 JUMP -14
+# If found but not at heap end, check if not last block before end
+# Check if block could be splitt in two, second block would need 4
+# Right now Data_len_old - Data_len_needed of current block is in acc
 SUBI 3                  # Overhead of split frame would need 3
 JUMPC <= 51              # If no Jump then split block
 LOADIN 1 0
@@ -465,6 +700,8 @@ STOREIN 1 0             # Change Frame Size to new Size
 STORE 2                 # Save new Frame Size
 LOADI 1
 STOREIN 1 1             # Mark Frame as used
+
+# Now store new Frame size at end of Frame
 MOVE in1 acc
 STORE 4                 # Store Pointer of this Frame
 ADD 2                   # Points to next Frame
@@ -473,9 +710,14 @@ LOAD 2
 STOREIN 1 -1            # Store new Frame size at end of Frame
 LOAD 4
 MOVE acc in1            # Restore Pointer to Frame Start
+
+# Before setting up splitt Block between this and next Block,
+# Check if this Block is last Block before Top of Heap
 MOVE in1 acc
 SUB 4095
 JUMPC >= 37              # Zero if this is last block. If positive, smth went wrong
+
+# Now create split Block after this one
 LOADIN 1 0              # New Frame Size
 STORE 2
 MOVE in1 acc
@@ -483,21 +725,28 @@ ADD 2
 MOVE acc in1            # Points to new split Frame
 LOADI 0
 STOREIN 1 1             # Mark as unused
+# Calculate split Block size
 LOAD 3                  # Original Block Size
 SUBI 3
 SUB 1
 STOREIN 1 0             # Store split block size
 STORE 3
+
+# Store split Block size at end of split Frame
 MOVE in1 acc
 ADD 3                   # Points to next Frame
 MOVE acc in1
 LOAD 3
 STOREIN 1 -1            # Store new Frame size at end of Frame
 JUMP 19
+# Done with this branch
+
 LOAD 1                  # Args count
 ADDI 3
 STOREIN 1 0             # Store Frame Size on Heap
 STORE 2
+
+# Now store new Frame size at end of Frame
 MOVE in1 acc
 STORE 4                 # Store Pointer of this Frame
 STORE 4095              # Update Heap Top Pointer
@@ -507,26 +756,35 @@ LOAD 2
 STOREIN 1 -1            # Store new Frame size at end of Frame
 LOAD 4
 MOVE acc in1            # Restore Pointer to Frame Start
+
+# Alloc without splitting
 LOADI 1
 STOREIN 1 1             # Mark Frame as used
 MOVE in1 acc
 STORE 4
 JUMP 1
+
 LOAD 0
 MOVE acc in1                # Load Pointer to return arg
 LOAD 4                      # Pointer to Heap Frame
 ADDI 2                      # Now point to first arg in heap Frame
 STOREIN 1 0
 JUMP -133
+
+###### FREE METHOD ######
 LOADIN 1 0                  # Heap Pointer to data
 SUBI 2                      # Change pointer to frame start
 STORE 1
 MOVE acc in1                # Heap Frame Pointer in IN1
 LOADI 0
 STOREIN 1 1                 # Mark Frame as unused
+
+# Check if Frame is last Frame on heap
 LOAD 1
 SUB 4095
 JUMPC >= 43
+
+# Now check if Frame behind is unused
 LOADIN 1 0
 STORE 2
 MOVE in1 acc
@@ -534,6 +792,7 @@ ADD 2
 MOVE acc in1
 LOADIN 1 1                  # Is next Frame used?
 JUMPC > 14                  # JUMP if used
+# Fuse this and next Frame
 LOADIN 1 0
 STORE 3                     # Store size of next Block
 LOAD 1
@@ -547,11 +806,14 @@ ADD 2
 MOVE acc in1                # Jump to end of fused Frame
 LOAD 2
 STOREIN 1 -1                # Update Frame Length at end of Frame
+
 MOVE in1 acc
 SUB 2
 MOVE acc in1                # Restore Pointer to Frame
+# Before checking Block before, ensure that this Block is not at M(4096)
 SUBI 4096
 JUMPC <= -167
+
 LOADIN 1 -1
 STORE 3
 MOVE in1 acc
@@ -569,9 +831,14 @@ MOVE acc in1                # Jump to end of fused Frame
 LOAD 2
 STOREIN 1 -1                # Update Frame Length at end of Frame
 JUMP -184
+
+
+# Update Heap Top Pointer
 LOAD 4095                   # Heap Top Pointer
 SUBI 4096
 JUMPC <= 20
+
+# Now check if Frame before is unused. Delete both if so
 LOADIN 1 -1
 STORE 3
 MOVE in1 acc
@@ -582,6 +849,7 @@ JUMPC = 4
 MOVE in1 acc
 ADD 3
 MOVE acc in1
+
 MOVE in1 acc
 SUBI 4096
 JUMPC <= 7
@@ -591,9 +859,12 @@ MOVE in1 acc
 SUB 3
 STORE 4095                  # Store updated Heap top Pointer
 JUMP -206
+
 LOADI 4095
 STORE 4095
 JUMP -209
+
+###### REALLOC METHOD ######
 LOADI 0
 STORE 4                     # Reset Flag in M(4)
 LOADIN 1 1                  # Wanted Size
@@ -606,40 +877,57 @@ LOADIN 1 0
 SUBI 3                      # 3 cells needed for Header/Footer
 SUB 2                       # Space needed for new Size
 JUMPC < 35                  # If old-space - new_space >= 0, reuse block. 0 = perfect fit
+# Old Block Reusable. Check if Splitting makes sense and if frame is last on heap
 STORE 3
 MOVE in1 acc
 SUB 4095
 JUMPC < 3
 LOADI 1
 STORE 4                     # Store Flag to resize Block but not to create new Split Block
+
 LOAD 3
 SUBI 3                      # Check if Splitting Frame is possible
 JUMPC <= -230               # If split useless, return. Pointer already on arg stack
+
+# Split Frames. Use Code from Malloc
 LOADIN 1 0
 STORE 3                 # Store original Frame Size in M(3)
 LOAD 2                  # Load wanted size
 ADDI 3                  # Add overhead size
 STOREIN 1 0             # Change Frame Size to new Size
 STORE 2                 # Save new Frame Size
+
+# Now store new Frame size at end of Frame
 MOVE in1 acc
 ADD 2                   # Points to next Frame
 MOVE acc in1
 LOAD 2
 STOREIN 1 -1            # Store new Frame size at end of Frame
+
+# Before setting up splitt Block between this and next Block,
+# Check if Flag to skip creating split block is set (1=dont create split block)
 LOAD 4
 JUMPC > -243            # If no split block needed, done. Pointer already on arg stack
+
+# Now create split Block after this one
 LOADI 0
 STOREIN 1 1             # Mark as unused
+# Calculate split Block size
 LOAD 3                  # Original Block Size
 SUB 2                   # Sub Frame Size of new Frame
 STOREIN 1 0             # Store split block size
 STORE 2
+
+# Store split Block size at end of split Frame
 MOVE in1 acc
 ADD 2                   # Points to next Frame
 MOVE acc in1
 LOAD 2
 STOREIN 1 -1            # Store new Frame size at end of Frame
 JUMP -255
+# Done with this branch
+
+# Check if Frame is last one
 MOVE in1 acc
 SUB 4095
 JUMPC < 11
@@ -653,6 +941,8 @@ MOVE acc in1            # Jump to end of frame
 LOAD 3                  # Load Frame Size
 STOREIN 1 -1          # Update end Frame size
 JUMP -268               # Return
+
+# Check if next Frame is Free and big enough and Split is usefull
 LOADIN 1 0
 STORE 3
 MOVE in1 acc
@@ -667,8 +957,10 @@ ADDI 3                  # Add header
 SUB 3                   # Minus (header+old data size) = minimum size of next Block
 SUB 4                   # Subtract actual size of next Block
 JUMPC > 44                  # Zero or negativ if Space is enough
+# Check if Split of next Frame is usefull
 ADDI 4                  # Leftover Space is NEGATIVE, so if <= 0, split
 JUMPC <= 14
+# Just put two Frames together. No split of next Frame.
 MOVE in1 acc
 SUB 3
 MOVE acc in1
@@ -682,6 +974,8 @@ MOVE acc in1            # Point to next Frame
 LOAD 3
 STOREIN 1 -1            # Store Frame size at Frame end
 JUMP -297
+
+# Next block can be reused and split. Resize old Block, then do rest
 MOVE in1 acc
 SUB 3
 MOVE acc in1
@@ -710,6 +1004,9 @@ MOVE acc in1            # Point to end of Split Frame
 LOAD 4
 STOREIN 1 -1            # Update size pointer at end of Split Frame
 JUMP -325               # Adress of Heap didnt change, so old pointer in arg is correct
+
+# Old Block couldnt be reused in any way. alloc new space, then copy.
+# Call Malloc
 LOADI 1
 STORE 1026
 LOAD 2                  # Size of new Data is at M(2)
@@ -719,11 +1016,14 @@ STORE 1024
 MOVE pc acc
 STORE 1025
 JUMP -379
+
 LOAD 0                  # Load Pointer to return cell
 MOVE acc in1
 LOAD 1030               # Points at data-cells of new frame, not frame start
 STOREIN 1 0             # Store new Pointer at return cell
 STORE 4
+
+# Now copy Data from old frame to new Frame. New Frame > Old Frame!
 LOAD 1                  # Pointer to old Frame start
 ADDI 2                  # Point to old data start
 STORE 3
@@ -750,6 +1050,8 @@ MOVE in1 acc
 ADDI 1                  # Increase new data pointer by one
 STORE 4
 JUMP -18
+
+# Free old Block, then return. Return val is already stored
 LOADI 1
 STORE 1026
 LOAD 1                  # Points to beginn of Frame
@@ -761,6 +1063,9 @@ MOVE pc acc
 STORE 1025
 JUMP -420
 JUMP -376
+
+###### CALLOC ######
+# Call Malloc
 LOADIN 1 0          # load n
 STORE 1030          # store as argument
 LOADI 1
@@ -770,6 +1075,7 @@ STORE 1024
 MOVE pc acc
 STORE 1025
 JUMP -430           # CALL
+
 LOAD 1030           # Pointer to data-start
 STOREIN 1 0
 STORE 2
@@ -779,20 +1085,27 @@ SUBI 3              # subtract header size
 STORE 3             # M(3) = Loop Counter
 LOADI 0
 STORE 4
+
 LOAD 3
 JUMPC <= 10             # if <= done with filling zero
 SUBI 1
 STORE 3             # decrease counter
+
 LOAD 4              # Load 0
 STOREIN 1 0         # Copy 0 to data-cell
+
 LOAD 2              # Load pointer
 ADDI 1              # increase pointer
 STORE 2             # store new pointer
 MOVE acc in1        # put pointer into in1
 JUMP -10
+
+# Der Daten-Pointer steht noch in M(1030) (von MALLOC geschrieben).
+# Damit ist der Rückgabewert bereits an der richtigen Stelle.
 JUMP -406
 LOADI 99
 STORE 0
+
 LOAD 0
 ADDI 1
 MOVE ACC IN1
@@ -801,4 +1114,55 @@ SUBI 100
 STOREIN 1 0
 SUBI 127
 JUMPC < -7
-JUMP -801
+JUMP -912
+
+###### MIN METHOD ######
+LOADIN 1 0              # IN1 is Frame-Pointer because Call Method puts it there
+STORE 1                 # x is now at M(1)
+LOADIN 1 1
+SUB 1                   # y - x
+JUMPC >= -422      # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
+LOADIN 1 1
+STOREIN 1 0             # Store y in ReturnValue Adress
+JUMP -425
+
+###### MAX METHOD ######
+LOADIN 1 0
+STORE 1                 # x is now at M(1)
+LOADIN 1 1
+SUB 1                   # y - x
+JUMPC <= -430      # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
+LOADIN 1 1
+STOREIN 1 0             # Store y in ReturnValue Adress
+JUMP -433
+
+###### MUL METHOD ######
+LOADIN 1 1
+STORE 2             # y Value
+JUMPC >= 4
+LOADI 0
+SUB 2
+STORE 2             # If y<0 negate y
+LOADIN 1 0
+STORE 1
+LOADIN 1 1
+JUMPC = -443        # if x is zero, zero is in return_adr, so return
+JUMPC >= 4
+LOADI 0
+SUB 1
+STORE 1
+LOADI 0             # Start with Zero
+STORE 3
+LOAD 2
+JUMPC <= 7
+SUBI 1
+STORE 2
+LOAD 3
+ADD 1
+STORE 3
+JUMP -7
+LOAD 0
+MOVE acc in1
+LOAD 3
+STOREIN 1 0
+JUMP -462

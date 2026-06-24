@@ -27,6 +27,20 @@ MOVE IN2 ACC
 ADDI 1
 MOVE ACC IN2            # Update Stack Pointer
 
+# switch to secondary monitor
+PRINTC 127
+PRINTC 191
+PRINTC 163
+PRINTC 149
+PRINTC 148
+PRINTC 152
+PRINTC 157
+PRINTC 204
+
+# please help me
+PRINTC 127
+PRINTC '['
+PRINTC 'H'
 
 LOOP:
 LOAD 3                  # GAP_END
@@ -291,8 +305,8 @@ JUMP UPDATE_INLINE
 # Status: character at gap_start-1 is already printed as it should be. Update needed at gap_end +1 to (base_end or newline)
 # Must set cursor to original position afterwards
 UPDATE_INLINE:
-LOADI 0
-STORE 5                 # Counter for reseting cursor later
+PRINTC 127
+PRINTC 155
 LOAD 3                  # GAP_END (last free cell)
 ADDI 1
 STORE 6                 # print_ptr
@@ -322,15 +336,9 @@ STORE 5
 JUMP UPDATE_INLINE_PLOOP
 
 UPDATE_INLINE_PLOOP_DONE:
-LOAD 5
-JUMPC <= LOOP
-SUBI 1
-STORE 5
 PRINTC 127
-PRINTC 191
-PRINTC 149
-PRINTC 168
-JUMP UPDATE_INLINE_PLOOP_DONE
+PRINTC 156
+JUMP LOOP
 
 # Prints the complete line. M(Gap_start -1) must be at last char of line
 REPRINT_LINE:
@@ -398,6 +406,17 @@ MOVE ACC IN1
 LOAD 100                # Zero Terminator
 STOREIN 1 0
 
+# switch to main monitor
+PRINTC 127
+PRINTC 191
+PRINTC 163
+PRINTC 149
+PRINTC 148
+PRINTC 152
+PRINTC 157
+PRINTC 208
+
+
 
 LOADIN 2 -1
 STORE 0
@@ -433,10 +452,124 @@ STRING_DONE:
     STORE 2
     PRINTC 2
 
+PRINTC 113
+PRINTC 110
+PRINTC 'I'
+PRINTC ':'
+PRINTC ' '
+
+LOADI 2                 # 2 Argument
+STORE 1026
+LOAD 0                  # Pointer to string
+STORE 1030              # Parse result to args
+LOADI 0
+STORE 1031
+LOADI *ATOI
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+PRINT 1030
+PRINTC 'O'
+PRINTC ':'
+PRINTC ' '
+PRINT 1031
+
 JUMP 0
 
+###### ATOI METHOD ######
+ATOI:
+LOADI 0
+STORE 4
+STORE 5
+LOADIN 1 0              # Pointer to String
+STORE 1
+LOADIN 2 -2
+STORE 2
+SUBI 1                  # If only one argument, then skip following
+JUMPC = ATOI_NO_OFFSET
+LOADIN 1 1              # Load offset
+STORE 3
+LOAD 1
+ADD 3
+STORE 1
+
+ATOI_NO_OFFSET:
+LOAD 1
+MOVE ACC IN1
+LOADIN 1 0
+SUB 145                 # Ascii '-' (negative Value)
+STORE 3                 # M(3) is zero if first char is negative, != 0 if not
+JUMPC != ATOI_PARSE_LOOP
+LOAD 1
+ADDI 1
+STORE 1
+
+ATOI_PARSE_LOOP:
+LOAD 1
+MOVE ACC IN1
+LOADIN 1 0
+SUBI 48
+STORE 2
+JUMPC < ATOI_END_FOUND
+SUBI 9
+JUMPC > ATOI_END_FOUND
+# Call multiply method and multiply old buffer by ten, then add number to buffer
+LOADI 2                 # 2 Arguments
+STORE 1026
+LOAD 4                  # Load Result of parser
+STORE 1030              # Parse result to args
+LOADI 10                # -1 to negate
+STORE 1031              # store -1 to args
+LOADI *MUL
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+LOAD 1030
+ADD 2
+STORE 4
+LOAD 1
+ADDI 1
+STORE 1
+JUMP ATOI_PARSE_LOOP
+
+
+ATOI_END_FOUND:
+LOAD 3
+JUMPC != ATOI_END       # Jump if no - found before number
+LOADI 2                 # 2 Arguments
+STORE 1026
+LOAD 4                  # Load Result of parser
+STORE 1030              # Parse result to args
+LOADI -1                # -1 to negate
+STORE 1031              # store -1 to args
+LOADI *MUL
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+LOAD 1030
+STORE 4
+
+ATOI_END:
+LOAD 0
+MOVE ACC IN1
+LOADIN 2 -2
+SUBI 1
+JUMPC = ATOI_NO_OFFSET_RET
+LOADIN 1 0
+STORE 2
+LOAD 1
+SUB 2
+STOREIN 1 1
+ATOI_NO_OFFSET_RET:
+LOAD 4
+STOREIN 1 0
+JUMP RETURN
 
 
 #include "stack_call_labels.txt"
 #include "malloc_labels.txt"
 #include "ascii_labels.txt"
+#include "math_labels.txt"
