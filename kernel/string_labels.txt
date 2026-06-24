@@ -18,6 +18,7 @@ STORE 1025
 JUMP CALL
 LOAD 1030
 STOREIN 2 0             # Store Pointer to String on Stack (BASE_PTR)
+STORE 1
 STORE 2                 # M(2) Is GAP_START (On start equal to BASE_PTR)
 ADDI 31                 # Block size -1
 STORE 3                 # M(3) is GAP_END
@@ -31,10 +32,6 @@ LOOP:
 LOAD 3                  # GAP_END
 SUB 2                   # - GAP_START
 JUMPC > READ_NEXT_CHAR
-LOAD 3
-ADDI 10                 # Resize new heap to +10 cells
-STORE 3
-
 # Realloc new Block
 LOADI 10
 STORE 6                 # Amount to resize new BASE
@@ -76,7 +73,6 @@ ADD 6                   # Add size increase
 STORE 4                 # Update Base End ptr 
 STORE 10                # Copy Register for copy loop
 
-
 COPY_LOOP:
 LOAD 8
 SUB 3
@@ -108,8 +104,7 @@ SUBI 27
 JUMPC = END
 LOAD 0
 SUBI 13
-JUMPC != CON_ENTER
-PRINTC 110              # If pressed Enter, need to print 10 (Newline) instead of 13 (carry return)
+JUMPC != CON_ENTER      # If pressed Enter, need to check if there is content behind cursor. But first save newline on heap
 LOAD 2                  # Load gap_start
 MOVE ACC IN1
 LOAD 110                # Store Newline in Heap
@@ -117,7 +112,24 @@ STOREIN 1 0
 LOAD 2
 ADDI 1
 STORE 2                 # Update gap_start
+
+LOAD 3
+SUB 4
+JUMPC != ENTER_NOT_LAST_CHAR
+PRINTC 113              # If pressed Enter, need to print 10 (Newline) after 13 (carry return)
+PRINTC 110
 JUMP LOOP
+ENTER_NOT_LAST_CHAR:
+PRINTC 127
+PRINTC 191
+PRINTC 175              # Clear from cursor to end of this line
+PRINTC 113              
+PRINTC 110              # Move cursor to first pos of next line
+PRINTC 127
+PRINTC 191
+PRINTC 176              # Insert new line (move this and all following lines one down)
+JUMP UPDATE_INLINE
+
 
 CON_ENTER:
 LOAD 0
@@ -127,31 +139,57 @@ JUMPC != CON_RETURN
 PRINTC 0
 PRINTC 132
 PRINTC 0
-
 LOAD 2
 SUBI 1
-STORE 2                 # Update Counter Value
+STORE 2                 # Update gap_start
 MOVE ACC IN1
-LOAD 132
-STOREIN 1 0
-JUMP LOOP
+LOADIN 1 0              # Load deleted char. If it was /n, need to do further logic.
+SUB 110
+JUMPC != UPDATE_INLINE
+PRINTC 127
+PRINTC 191
+PRINTC 177              # This sequence deletes this line / moves line under this up by one line
+PRINTC 127
+PRINTC 191
+PRINTC 149
+PRINTC 165              # This sequence moves cursor line up (now is at beginning of line)
+# now move cursor to end of this line. need to count chars in line before gap_start
+LOAD 2
+SUBI 1
+STORE 5                 # check_ptr
+
+BACKSPACE_RETLINE_LOOP:
+LOAD 5
+MOVE ACC IN1
+SUB 1                   # - Base_ptr
+JUMPC < UPDATE_INLINE
+LOADIN 1 0              # Load char at this cell
+SUB 110                 # Check if this char is a newline
+JUMPC = UPDATE_INLINE
+PRINTC 127
+PRINTC 191
+PRINTC 167              # Sequence for Cursor right
+LOAD 5
+SUBI 1
+STORE 5
+JUMP BACKSPACE_RETLINE_LOOP
+
 
 CON_RETURN:
 LOAD 0
 SUBI 57419
 JUMPC != CON_ARLEFT
-# Arrow left sequence
-PRINTC 127
-PRINTC 191
-PRINTC 149
-PRINTC 168
+# Check if cursor to left is allowed
+LOADIN 2 -1             # Load Base_ptr
+SUB 2                   # Subtract gap_start. If zero than cursor already is on first index. Do Nothing
+JUMPC >= READ_NEXT_CHAR # No need to check for resizing block, didn't touch block
 # Move Gap in Base
 LOAD 2
+SUBI 1
 MOVE ACC IN1
 LOADIN 1 0
 STORE 5
-LOAD 2
-SUBI 1
+MOVE IN1 ACC
 STORE 2
 LOAD 3
 MOVE ACC IN1
@@ -160,42 +198,176 @@ STOREIN 1 0
 LOAD 3
 SUBI 1
 STORE 3
+# Now check if cursor is at beginning of line. Moved character is in M(5)
+LOAD 5
+SUB 110                 # Zero if char was newline
+JUMPC = ARRLEFT_LINEUP
+# Arrow left sequence
+PRINTC 127
+PRINTC 191
+PRINTC 168
 JUMP LOOP
+#If cursor was at beginning of line, gotta move up and to end
+ARRLEFT_LINEUP:
+PRINTC 127
+PRINTC 177               # Sequence to move cursor up one line and move screen down if needed
+# Now gotta move cursor to last char in this line
+LOAD 2
+SUBI 1
+STORE 5                 # check_ptr
+
+ARRLEFT_LINEUP_LOOP:
+LOAD 5
+MOVE ACC IN1
+SUB 1                   # - Base_ptr
+JUMPC < LOOP
+LOADIN 1 0              # Load char at this cell
+SUB 110                 # Check if this char is a newline
+JUMPC = LOOP
+PRINTC 127
+PRINTC 191
+PRINTC 167              # Sequence for Cursor right
+LOAD 5
+SUBI 1
+STORE 5
+JUMP ARRLEFT_LINEUP_LOOP
+
 
 CON_ARLEFT:
 LOAD 0
 SUBI 57421
 JUMPC != CON_ARRIGHT
+# Check if cursor to right is allowed
+LOAD 4                  # base_end
+SUB 3                   # Subtract gap_end. If zero than cursor already is on first index. Do Nothing
+JUMPC <= READ_NEXT_CHAR # No need to check for resizing block, didn't touch block
+# Move Gap in Base
+LOAD 3
+ADDI 1
+MOVE ACC IN1
+LOADIN 1 0
+STORE 5
+MOVE IN1 ACC
+STORE 3
+LOAD 2
+MOVE ACC IN1
+LOAD 5
+STOREIN 1 0
+LOAD 2
+ADDI 1
+STORE 2
+LOAD 5                  # character that got moved over gap
+SUB 110                 # Check if moved character was newline
+JUMPC = ARRRIGHT_LINEDOWN
 # Arrow right sequence
 PRINTC 127
 PRINTC 191
-PRINTC 149
 PRINTC 167
 JUMP LOOP
+ARRRIGHT_LINEDOWN:
+PRINTC 113
+PRINTC 110
+JUMP UPDATE_INLINE
 
 CON_ARRIGHT:
 # Normal Char
 PRINTC 0                # Print char to screen
-
 # Now Save char in Heap
-LOADIN 2 -1
-ADD 2
+LOAD 2                  # Gap_start ptr
 MOVE ACC IN1
 LOAD 0
 STOREIN 1 0
 
 LOAD 2
 ADDI 1
-STORE 2                 # Update Counter Value
-JUMP LOOP
+STORE 2                 # Update Gap_start
+JUMP UPDATE_INLINE
 
-END:
-LOADIN 2 -1
-ADD 2
-MOVE ACC IN1
+# If editing is done in between characters, its nessesary to update the rest of the line
+# Status: character at gap_start-1 is already printed as it should be. Update needed at gap_end +1 to (base_end or newline)
+# Must set cursor to original position afterwards
+UPDATE_INLINE:
 LOADI 0
+STORE 5                 # Counter for reseting cursor later
+LOAD 3                  # GAP_END (last free cell)
+ADDI 1
+STORE 6                 # print_ptr
 
-STOREIN 1 0             # Store Zero Terminator
+# Send ESC [ K to clear the rest of the line before repainting
+PRINTC 127              # ESC (27 + 100)
+PRINTC 191              # [ (91 + 100)
+PRINTC 175              # K (75 + 100)
+
+UPDATE_INLINE_PLOOP:
+LOAD 4
+SUB 6                   # base_end - print_ptr
+JUMPC < UPDATE_INLINE_PLOOP_DONE
+LOAD 6
+MOVE ACC IN1
+LOADIN 1 0
+STORE 7
+SUB 110                 # 110 is newline char
+JUMPC = UPDATE_INLINE_PLOOP_DONE
+PRINTC 7
+MOVE IN1 ACC
+ADDI 1
+STORE 6
+LOAD 5
+ADDI 1
+STORE 5
+JUMP UPDATE_INLINE_PLOOP
+
+UPDATE_INLINE_PLOOP_DONE:
+LOAD 5
+JUMPC <= LOOP
+SUBI 1
+STORE 5
+PRINTC 127
+PRINTC 191
+PRINTC 149
+PRINTC 168
+JUMP UPDATE_INLINE_PLOOP_DONE
+
+# Prints the complete line. M(Gap_start -1) must be at last char of line
+REPRINT_LINE:
+LOAD 3                  # GAP_END (last free cell)
+ADDI 1
+STORE 6                 # print_ptr
+
+LOAD 6
+SUB 1
+
+
+###### THIS IS AFTER INPUT ENDED ######
+
+# Now get rid of gap in string in order to use it 
+END:
+FINISH_STRING_LOOP:
+LOAD 4
+SUB 3
+JUMPC <= DONE_FINISH_STRING
+LOAD 3
+ADDI 1
+MOVE ACC IN1
+LOADIN 1 0
+STORE 5
+MOVE IN1 ACC
+STORE 3
+LOAD 2
+MOVE ACC IN1
+LOAD 5
+STOREIN 1 0
+LOAD 2
+ADDI 1
+STORE 2
+JUMP FINISH_STRING_LOOP
+
+DONE_FINISH_STRING:
+LOAD 2                  # Gap_start
+MOVE ACC IN1 
+LOAD 100                # Zero Terminator
+STOREIN 1 0
+
 
 LOADIN 2 -1
 STORE 0
@@ -232,6 +404,8 @@ STRING_DONE:
     PRINTC 2
 
 JUMP 0
+
+
 
 #include "stack_call_labels.txt"
 #include "malloc_labels.txt"
