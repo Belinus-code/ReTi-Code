@@ -8,13 +8,14 @@
 ## CALL
 ### Stack Build:
 - M(IN2-1): Absolute Return Adress of Callee
-- M(IN2-2): Amount of Arguments for this Method on Stack
+- M(IN2-2): Amount of Arguments for this Method on Stack 
 - M(IN2-3) to M(IN2-(2+n)): Arguments
 - M(IN2-(3+n)) to M(IN2-(8+n)): Copy of M(0) to M(4) of Callee
 - M(IN2-(9+n)): IN1 Register of Callee
 
-### Arguments
+### Calling a Method
 - Amount of Args are to be stored at M(1026)
+- Amount gets set to zero after every Method Call
 - All arguments are to be stored at M(1030) and following
 - Store relative offset to method in M(1024) (use label parser for offset)
 - Last thing before call must always be: MOVE PC ACC; STORE 1025; JUMP CALL
@@ -79,3 +80,12 @@ Same as Malloc(n) but filles complete Block with zeros.
 # Strings
 - For easy Print, every Ascii Character is stored in M(<char value> + 100)
     - E.g.: a = M(197) because ord(a) = 97 -> 97 + 100 = 197
+- Every String ends with a Zero Terminator (=0)
+## ATOI
+    - 1. Argument: Pointer to String Buffer
+    - 2. Argument (Optional): Offset to first Digit (Zero if not provided)
+    - First char after aplying offset must be a digit or '-' value
+    - If first digit is no digit, zero will be returned
+    - Stops Parsing once a non-digit character has been found
+    - Parsed Value will be at M(1030)
+    - If Offset was provided, Offset from buffer-start to first character AFTER last digit is will be returned to M(1031)

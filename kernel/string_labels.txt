@@ -132,6 +132,11 @@ SUB 4
 JUMPC != ENTER_NOT_LAST_CHAR
 PRINTC 113              # If pressed Enter, need to print 10 (Newline) after 13 (carry return)
 PRINTC 110
+LOADI *GET_SCREEN_SIZE
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
 JUMP LOOP
 ENTER_NOT_LAST_CHAR:
 PRINTC 127
@@ -566,6 +571,202 @@ STOREIN 1 1
 ATOI_NO_OFFSET_RET:
 LOAD 4
 STOREIN 1 0
+JUMP RETURN
+
+###### GET_SCREEN_SIZE METHOD ######
+GET_SCREEN_SIZE:
+PRINTC 127
+PRINTC '7'              # This saves Cursor position
+PRINTC 127
+PRINTC '['
+PRINTC '9'
+PRINTC '9'
+PRINTC '9'
+PRINTC ';'
+PRINTC '9'
+PRINTC '9'
+PRINTC '9'
+PRINTC 'f'              # This sequence moves cursor in right down corner
+# CALL GET_CURSOR_POSITION here!!
+LOADI 3
+STORE 1026              # Expect 3 Return arguments
+LOADI 0
+STORE 1030
+STORE 1031
+STORE 1032
+LOADI *GET_CURSOR_POSITION
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+PRINTC 127
+PRINTC '8'              # Restore saved Cursor Position
+JUMP RETURN
+
+
+
+###### GET_CURSOR_POSITION ######
+GET_CURSOR_POSITION:
+# Alloc Buffer for input String
+LOADI 1
+STORE 1026
+LOADI 128               # Alloc 128 Cells for Temp Buffer
+STORE 1030
+LOADI *CALLOC
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+LOAD 1030
+STORE 1
+STORE 2                 # Pointer to buffer-position
+LOADI -2                # set to -1 if esc is found. Set to zero if [ found and is equal -1
+STORE 3                 # Offset Counter to device-status-answer
+
+PRINTC 127
+PRINTC '['
+PRINTC '6'
+PRINTC 'n'              # Device status report (Request Cursor position in input buffer)
+# Now cursor position should be in input buffer as ESC[#;#R
+
+LOAD 2
+MOVE ACC IN1
+GET_CSR_POS_INPUT_LOOP:
+READ 0
+STORE 4
+STOREIN 1 0
+MOVE IN1 ACC
+ADDI 1
+MOVE ACC IN1
+LOAD 3
+ADDI 1
+JUMPC = GET_CRS_POS_CHECK_SECOND
+LOAD 4
+SUBI 27                 # Check if is ESC
+JUMPC != GET_CSR_POS_INPUT_LOOP
+LOADI -1
+STORE 3                 # Save Flag that esc was found
+JUMP GET_CSR_POS_INPUT_LOOP
+GET_CRS_POS_CHECK_SECOND:
+LOAD 4
+SUB '['
+JUMPC = GET_CRS_POS_SEC_FOUND
+LOADI -2
+STORE 3
+JUMP GET_CSR_POS_INPUT_LOOP
+
+# ESC [ Found, now just copy into buffer until R is found
+GET_CRS_POS_SEC_FOUND:
+MOVE IN1 ACC
+STORE 3                 # Store Pointer to first number
+GET_CRS_POS_SECINPUT_LOOP:
+READ 0
+STORE 4
+STOREIN 1 0
+MOVE IN1 ACC
+ADDI 1
+MOVE ACC IN1
+LOAD 4                  # Load input Value
+SUB 'R'
+JUMPC != GET_CRS_POS_SECINPUT_LOOP
+MOVE IN1 ACC
+STORE 2                 # Points to first free cell in Buffer
+
+# Now Answer is in Buffer and all Pointers are saved. Prepare for atoi Call
+LOAD 3                  # Points to first ASCII Number
+SUB 1                   # Points to buffer start
+STORE 3                 # Offset from Buffer-start
+LOAD 1
+STORE 1030
+LOAD 3
+STORE 1031
+LOADI 2
+STORE 1026
+LOADI *ATOI
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+
+LOAD 0
+MOVE ACC IN1
+LOAD 1030
+STOREIN 1 0             # Store first Value in return buffer
+LOAD 1
+STORE 1030
+LOAD 1031               # Here offset is returned
+ADDI 1
+STORE 1031
+LOADI 2
+STORE 1026
+LOADI *ATOI
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+
+LOAD 0
+MOVE ACC IN1
+LOAD 1030
+STOREIN 1 1             # Store second Value in return buffer
+# Place zero Terminator in place of ESC in case there are chars infront
+LOAD 1                  # Pointer to buffer start
+ADD 3                   # Offset to first Digit
+SUBI 2                  # Now points to ESC
+MOVE ACC IN1
+LOADI 0
+STOREIN 1 0             # Store Zero Terminator at place of esc
+# Now check if Buffer contains anything else than cursor position. If not, free it. Else, also return Buffer
+LOAD 3                  # Offset to first Digit
+SUBI 2                  # Offset is two if no other characters before
+JUMPC != GET_CRS_POS_BUF_FUL
+LOAD 1
+STORE 1030
+LOADI 1
+STORE 1026
+LOADI *FREE
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+LOADI 0
+STORE 1
+GET_CRS_POS_BUF_FUL:
+LOAD 0
+MOVE ACC IN1
+LOAD 1
+STOREIN 1 2
+
+### Just a test to verify###
+
+# Switch to Main Monitor
+PRINTC 127
+PRINTC 191
+PRINTC 163
+PRINTC 149
+PRINTC 148
+PRINTC 152
+PRINTC 157
+PRINTC 208
+
+LOADIN 1 0
+STORE 0
+PRINT 0
+LOADIN 1 1
+STORE 0
+PRINT 0
+PRINTC 113
+PRINTC 110
+
+# switch to secondary monitor
+PRINTC 127
+PRINTC 191
+PRINTC 163
+PRINTC 149
+PRINTC 148
+PRINTC 152
+PRINTC 157
+PRINTC 204
 JUMP RETURN
 
 

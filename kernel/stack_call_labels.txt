@@ -98,6 +98,8 @@ RETURN_ARG_LOOP:
 
 # 4. Restore M(4) down to M(0) (Reverse order)
 CALL_RESOTRE_REGS:
+    LOADI 0
+    STORE 1026              # Reset Arg count to Zero
     LOADIN 2 -3
     STORE 4
     LOADIN 2 -4
@@ -128,6 +130,8 @@ PREPARE_STACK:
     MOVE acc in2            # IN2 is always Stackpointer
     LOADI 4095
     STORE 4095              # Store Heap Top Pointer
+    LOADI 0
+    STORE 1026              # Default Argument Amount is zero
 
     # Fill M(0) to M(4) and IN1 with data (Otherwise Python error)
     LOADI 0
