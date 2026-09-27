@@ -14,12 +14,12 @@
 - M(IN2-(9+n)): IN1 Register of Callee
 
 ### Calling a Method
-- Amount of Args are to be stored at M(1026)
+- Amount of Argument or Return Values (use bigger one) are to be stored at M(1026)
 - Amount gets set to zero after every Method Call
 - All arguments are to be stored at M(1030) and following
 - Store relative offset to method in M(1024) (use label parser for offset)
 - Last thing before call must always be: MOVE PC ACC; STORE 1025; JUMP CALL
-- Call copys all arguments to stack automatically, Pointer to first Arg gets stored at M(0)
+- Call copys all arguments to stack automatically, Pointer to first Arg gets stored at M(0) and IN1
 - Return Values are to placed at same Place at Arguments where copied to on stack
 - Return Method will copy all Arguments (or Return values is placed there) from Stack to M(1030) and following
 
@@ -89,3 +89,31 @@ Same as Malloc(n) but filles complete Block with zeros.
     - Stops Parsing once a non-digit character has been found
     - Parsed Value will be at M(1030)
     - If Offset was provided, Offset from buffer-start to first character AFTER last digit is will be returned to M(1031)
+## GET_LINE_WIDTH
+    - 1. Argument: Pointer to String
+    - 2. Argument: Pointer to eof String
+    - 3. Argument: Pointer to any Character of specific line
+    - Only whole Strings accecepted, no Gap-Strings (split string in two if needed)
+    - If target character (third argument) points to newline, it is seen as the end of the current line
+    - First Return Value is Amount of visable Characters in Line. -1 if Error
+    - Second Return Value is 1 if Line is first Line of String, otherwise 0
+    - Third Return Value is 1 if Line is last Line of String, otherwise 0
+    - If first Value is -1, second and third Return Value cannot be trusted
+
+## GET_CURSOR_POSITION
+    - No input Arguments required, however three Return Arguments, so set amount to 3
+    - First Return Value is y-coordinate, starting at 1 at the top of the screen
+    - Second Return Value is x-coordinate, starting at 1 at the left side of the screen
+    - Third Return Value is a Pointer to an Input-Buffer filled with Keyboard Input values which were
+      read during parsing. If there werent any additional Inputs, Pointer will be NULL (0)
+    - Warning! If Third Return Value is a real Pointer, you need to free it once dealed with the inputs!
+
+## GET_SCREEN_SIZE
+    - No input Arguments required, however three Return Arguments, so set amount to 3
+    - First Return Value is the height of the screen
+    - Second Return Value is the width of the screen
+    - Third Return Value is a Pointer to an Input-Buffer filled with Keyboard Input values which were
+      read during parsing. If there werent any additional Inputs, Pointer will be NULL (0)
+    - Warning! If Third Return Value is a real Pointer (!=0), you need to free it once dealed with the inputs!
+
+

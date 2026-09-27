@@ -18,7 +18,7 @@ STORE 1025
 JUMP CALL
 LOAD 1030
 STOREIN 2 0             # Store Pointer to String on Stack (BASE_PTR)
-STORE 1
+STORE 1                 # M(1) Is BASE_PTR
 STORE 2                 # M(2) Is GAP_START (On start equal to BASE_PTR)
 ADDI 31                 # Block size -1
 STORE 3                 # M(3) is GAP_END
@@ -37,10 +37,16 @@ PRINTC 152
 PRINTC 157
 PRINTC 204
 
-# please help me
+# Move Cursor to Home Position
 PRINTC 127
 PRINTC '['
 PRINTC 'H'
+
+# Clean screen
+PRINTC 127
+PRINTC '['
+PRINTC '2'
+PRINTC 'J'
 
 LOOP:
 LOAD 3                  # GAP_END
@@ -111,6 +117,8 @@ COPY_LOOP_DONE:
 LOAD 10
 STORE 3                  # Update Gap End ptr
 
+##### READING INPUT!!!#####
+
 READ_NEXT_CHAR:
 READ 0
 STORE 0
@@ -132,11 +140,19 @@ SUB 4
 JUMPC != ENTER_NOT_LAST_CHAR
 PRINTC 113              # If pressed Enter, need to print 10 (Newline) after 13 (carry return)
 PRINTC 110
-LOADI *GET_SCREEN_SIZE
+
+LOADI 3
+STORE 1026              # Expect 3 Return arguments
+LOADI 0
+STORE 1030
+STORE 1031
+STORE 1032
+LOADI *GET_CURSOR_POSITION
 STORE 1024
-MOVE pc acc
+MOVE PC ACC
 STORE 1025
 JUMP CALL
+
 JUMP LOOP
 ENTER_NOT_LAST_CHAR:
 PRINTC 127
@@ -152,9 +168,13 @@ JUMP UPDATE_INLINE
 
 CON_ENTER:
 LOAD 0
-SUBI 8
+SUBI 8                  # Depending on system this may also be DEL (127) instead of BS (8)
 JUMPC != CON_RETURN
 # BACKSPACE
+# Check if Backspace is allowed, thus if there are any characters available to Delete
+LOAD 2
+SUB 1
+JUMPC <= LOOP
 PRINTC 0
 PRINTC 132
 PRINTC 0
@@ -173,6 +193,19 @@ PRINTC 191
 PRINTC 149
 PRINTC 165              # This sequence moves cursor line up (now is at beginning of line)
 # now move cursor to end of this line. need to count chars in line before gap_start
+# Call Reprint line to ensure everything up to cursor is placed
+LOAD 1
+STORE 1030
+LOAD 2
+STORE 1031
+LOADI 2
+STORE 1026
+LOADI *REPRINT_LINE
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+JUMP UPDATE_INLINE
 LOAD 2
 SUBI 1
 STORE 5                 # check_ptr
@@ -233,11 +266,19 @@ PRINTC 177               # Sequence to move cursor up one line and move screen d
 PRINTC 127              # ESC (27 + 100)
 PRINTC 191              # [ (91 + 100)
 PRINTC 175              # K (75 + 100)  Sequence to clear to end of line
-JUMP REPRINT_LINE
-# Now gotta move cursor to last char in this line
+# Call Reprint line to ensure everything up to cursor is placed
+LOAD 1
+STORE 1030
 LOAD 2
-SUBI 1
-STORE 5                 # check_ptr
+STORE 1031
+LOADI 2
+STORE 1026
+LOADI *REPRINT_LINE
+STORE 1024
+MOVE pc acc
+STORE 1025
+JUMP CALL
+JUMP LOOP
 
 ARRLEFT_LINEUP_LOOP:
 LOAD 5
@@ -308,18 +349,18 @@ JUMP UPDATE_INLINE
 
 # If editing is done in between characters, its nessesary to update the rest of the line
 # Status: character at gap_start-1 is already printed as it should be. Update needed at gap_end +1 to (base_end or newline)
-# Must set cursor to original position afterwards
+# Cursor will be at original position afterwards
 UPDATE_INLINE:
 PRINTC 127
-PRINTC 155
+PRINTC 155              # Store Cursor Position
 LOAD 3                  # GAP_END (last free cell)
 ADDI 1
 STORE 6                 # print_ptr
 
 # Send ESC [ K to clear the rest of the line before repainting
 PRINTC 127              # ESC (27 + 100)
-PRINTC 191              # [ (91 + 100)
-PRINTC 175              # K (75 + 100)
+PRINTC '['
+PRINTC 'K'
 
 UPDATE_INLINE_PLOOP:
 LOAD 4
@@ -345,8 +386,14 @@ PRINTC 127
 PRINTC 156
 JUMP LOOP
 
-# Prints the complete line. M(Gap_start -1) must be at last char of line
+# Reprints Line starting from first character of Line up to Cursor.
+# Cursor will be at last char before the gap
+##### REPRINT LINE #####
 REPRINT_LINE:
+LOADIN 1 0
+STORE 1
+LOADIN 1 1
+STORE 2
 LOAD 2                  # GAP_start (last occupied cell)
 SUBI 1
 STORE 6                 # print_ptr
@@ -372,7 +419,7 @@ REPRINT_LINE_ATBACK:
 LOAD 6
 MOVE ACC IN1
 SUB 2                   # Subtract gap_start
-JUMPC >= LOOP
+JUMPC >= RETURN
 LOADIN 1 0
 STORE 5
 PRINTC 5
@@ -385,6 +432,7 @@ JUMP REPRINT_LINE_ATBACK
 
 # Now get rid of gap in string in order to use it 
 END:
+
 FINISH_STRING_LOOP:
 LOAD 4
 SUB 3
@@ -463,7 +511,7 @@ PRINTC 'I'
 PRINTC ':'
 PRINTC ' '
 
-LOADI 2                 # 2 Argument
+LOADI 2                 # 2 Arguments
 STORE 1026
 LOAD 0                  # Pointer to string
 STORE 1030              # Parse result to args
@@ -601,6 +649,14 @@ STORE 1025
 JUMP CALL
 PRINTC 127
 PRINTC '8'              # Restore saved Cursor Position
+LOAD 0
+MOVE ACC IN1
+LOAD 1030
+STOREIN 1 0             # Store y-Value
+LOAD 1031
+STOREIN 1 1             # Store x-Value
+LOAD 1032
+STOREIN 1 2             # Store Buffer-Pointer
 JUMP RETURN
 
 
@@ -736,38 +792,124 @@ LOAD 0
 MOVE ACC IN1
 LOAD 1
 STOREIN 1 2
-
-### Just a test to verify###
-
-# Switch to Main Monitor
-PRINTC 127
-PRINTC 191
-PRINTC 163
-PRINTC 149
-PRINTC 148
-PRINTC 152
-PRINTC 157
-PRINTC 208
-
-LOADIN 1 0
-STORE 0
-PRINT 0
-LOADIN 1 1
-STORE 0
-PRINT 0
-PRINTC 113
-PRINTC 110
-
-# switch to secondary monitor
-PRINTC 127
-PRINTC 191
-PRINTC 163
-PRINTC 149
-PRINTC 148
-PRINTC 152
-PRINTC 157
-PRINTC 204
 JUMP RETURN
+
+
+##### GET LINE WIDTH METHOD #####
+# Get the Width of the current Line, thus the amount of visable characters.
+GET_LINE_WIDTH:
+LOADIN 1 0
+STORE 1             # Start of String
+LOADIN 1 1
+STORE 2             # End of String
+LOADIN 1 2
+STORE 3             # Pointer to a char in specific line
+LOADI 0            
+STORE 5
+LOADI 1
+STORE 4
+
+# Boundry Checks (is cursor in String)
+LOAD 3
+SUB 1
+JUMPC < GET_LINE_WIDTH_ERROR
+LOAD 2
+SUB 3
+JUMPC < GET_LINE_WIDTH_ERROR
+
+# If Target Character is a newline, there is more logic to do
+LOAD 3
+MOVE ACC IN1
+LOADIN 1 0
+SUB 110
+JUMPC != GET_LINE_WIDTH_FIND_START
+# Target Char is newline, check if target char is first char of string:
+LOAD 3
+SUB 1
+JUMPC = GET_LINE_WIDTH_LOOP2
+LOAD 3
+SUBI 1
+STORE 3
+
+
+# Find beginning of Line
+GET_LINE_WIDTH_FIND_START:
+LOAD 3
+MOVE ACC IN1
+GET_LINE_WIDTH_LOOP1:
+LOADIN 1 0
+SUB 110
+JUMPC = GET_LINE_WIDTH_LOOP1E2
+MOVE IN1 ACC
+SUB 1
+JUMPC <= GET_LINE_WIDTH_LOOP1E1
+MOVE IN1 ACC
+SUBI 1
+MOVE ACC IN1
+JUMP GET_LINE_WIDTH_LOOP1
+
+GET_LINE_WIDTH_LOOP1E1:
+MOVE IN1 ACC
+STORE 3
+JUMP GET_LINE_WIDTH_LOOP2
+
+GET_LINE_WIDTH_LOOP1E2:
+MOVE IN1 ACC
+ADDI 1              # IN1 points to newline, add one to point to first char
+MOVE ACC IN1
+STORE 3
+LOADI 0
+STORE 4             # Clear Flag that Line is first line of String
+
+
+GET_LINE_WIDTH_LOOP2:
+MOVE IN1 ACC
+SUB 2
+JUMPC >= GET_LINE_WIDTH_LOOP2E1
+LOADIN 1 0
+SUB 110
+JUMPC = GET_LINE_WIDTH_LOOP2E2
+MOVE IN1 ACC
+ADDI 1
+MOVE ACC IN1
+JUMP GET_LINE_WIDTH_LOOP2
+
+GET_LINE_WIDTH_LOOP2E1:
+LOADI 1
+STORE 5
+JUMP GET_LINE_WIDTH_END
+
+GET_LINE_WIDTH_LOOP2E2:
+MOVE IN1 ACC
+SUBI 1
+MOVE ACC IN1
+
+GET_LINE_WIDTH_END:
+MOVE IN1 ACC
+SUB 3
+ADDI 1
+JUMPC >= 2
+LOADI 0                 # If width is negativ, set it to zero
+STORE 3
+LOAD 0
+MOVE ACC IN1
+LOAD 3
+STOREIN 1 0
+LOAD 4
+STOREIN 1 1
+LOAD 5
+STOREIN 1 2
+JUMP RETURN
+
+# In an Event of an Error, return -1
+GET_LINE_WIDTH_ERROR:
+LOAD 0
+MOVE ACC IN1
+LOADI -1
+STOREIN 1 0
+JUMP RETURN
+
+
 
 
 #include "stack_call_labels.txt"

@@ -49,7 +49,7 @@ CALL_ARGS_DONE:
     ADDI 8                  # finally update Stack-Pointer
     MOVE acc in2
 
-    # 6. Save Adress of first Argument to M(0), just for QOL
+    # 6. Save Adress of first Argument to M(0) and IN1, just for QOL
     SUBI 2                  # Stack-Counter - 2 Points to arg_count
     SUB 1026                # Now points to first Argument
     MOVE acc in1
