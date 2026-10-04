@@ -2,6 +2,8 @@
 MALLOC:
     LOADIN 1 0
     STORE 1                 # Size of to alloc memory
+    SUBI 1073741824
+    JUMPC > MALLOC_RETURN_NULL
     LOADI 4096              # Points of first frame
     MOVE acc in1
 MALLOC_SEARCH_LOOP:
@@ -109,12 +111,29 @@ MALLOC_FINISH:
     STOREIN 1 0
     JUMP RETURN
 
+MALLOC_RETURN_NULL:
+    LOAD 0
+    MOVE ACC IN1
+    LOADI 0
+    STOREIN 1 0
+    JUMP RETURN
+
 ###### FREE METHOD ######
 FREE:
     LOADIN 1 0                  # Heap Pointer to data
     SUBI 2                      # Change pointer to frame start
     STORE 1
     MOVE acc in1                # Heap Frame Pointer in IN1
+    # Check if Heap Pointer is valid
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *CHECK_HEAP_POINTER
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
     LOADI 0
     STOREIN 1 1                 # Mark Frame as unused
 
@@ -217,6 +236,16 @@ REALLOC:
     SUBI 2                      # Change pointer to frame start
     STORE 1
     MOVE acc in1                # Heap Frame Pointer in IN1
+    # Check if Heap Pointer is valid
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *CHECK_HEAP_POINTER
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
     LOADIN 1 0
     SUBI 3                      # 3 cells needed for Header/Footer
     SUB 2                       # Space needed for new Size
@@ -457,3 +486,82 @@ CALLOC_DONE:
     # Der Daten-Pointer steht noch in M(1030) (von MALLOC geschrieben).
     # Damit ist der Rückgabewert bereits an der richtigen Stelle.
     JUMP RETURN
+
+##### CHECK_HEAP_POINTER #####
+CHECK_HEAP_POINTER:
+    LOADIN 1 0
+    STORE 1             # Pointer to Heap Block Start
+    MOVE ACC IN1
+    SUBI 4096
+    JUMPC < SEGMENTATION_FAULT
+    LOAD 4095
+    SUB 1
+    JUMPC < SEGMENTATION_FAULT
+    LOADIN 1 1
+    JUMPC = SEGMENTATION_FAULT
+    LOADIN 1 0
+    STORE 2             # Size of Block
+    LOAD 1
+    SUBI 1
+    ADD 2
+    MOVE ACC IN1
+    LOADIN 1 0
+    SUB 2
+    JUMPC != SEGMENTATION_FAULT
+    JUMP RETURN
+
+##### SIZEOF #####
+SIZEOF:
+    LOADIN 1 0
+    MOVE ACC IN1
+    SUBI 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *CHECK_HEAP_POINTER
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOADIN 1 -2
+    SUBI 3
+    STORE 1
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 0
+    JUMP RETURN
+
+##### SEGMENTATION_FAULT #####
+SEGMENTATION_FAULT:
+    LOADIN 1 0
+    STORE 1
+    PRINTC '\n'
+    PRINTC 'S'
+    PRINTC 'E'
+    PRINTC 'G'
+    PRINTC 'M'
+    PRINTC 'E'
+    PRINTC 'N'
+    PRINTC 'T'
+    PRINTC 'A'
+    PRINTC 'T'
+    PRINTC 'I'
+    PRINTC 'O'
+    PRINTC 'N'
+    PRINTC ' '
+    PRINTC 'F'
+    PRINTC 'A'
+    PRINTC 'U'
+    PRINTC 'L'
+    PRINTC 'T'
+    PRINTC ':'
+    PRINTC ' '
+    PRINT 1
+    PRINTC '\n'
+    JUMP STACK_DUMP
+
+##### EXCEPTION #####
+EXCEPTION:
+    PRINTC "\nEXCEPTION CAUSED BY USER!\n"
+    JUMP STACK_DUMP

@@ -15,6 +15,16 @@ CALL:
     STOREIN 2 4
     LOAD 4
     STOREIN 2 5             # Stack +6
+    LOAD 5
+    STOREIN 2 6             # Manuell Increment of Stack to save Code
+    LOAD 6
+    STOREIN 2 7
+    LOAD 7
+    STOREIN 2 8
+    LOAD 8
+    STOREIN 2 9
+    LOAD 9
+    STOREIN 2 10             # Stack +11
 
     # 3. Copy n Arguments to stack
     LOADI 0
@@ -27,7 +37,7 @@ CALL_COPY_ARG_LOOP:
     ADD 1027                # Address: 1030 + i
     MOVE acc in1
     LOADIN 1 0              # Load argument from transfer area
-    STOREIN 2 6             # Push to stack
+    STOREIN 2 11             # Push to stack
     MOVE in2 acc            # Increment stack pointer
     ADDI 1
     MOVE acc in2
@@ -39,14 +49,14 @@ CALL_COPY_ARG_LOOP:
 # 4. Save Amount of Args (n) to Stack
 CALL_ARGS_DONE:
     LOAD 1026               # M (1026) is arg count
-    STOREIN 2 6
+    STOREIN 2 11
 
     # 5. Save Absolute Return Address to Stack (PC_ref + 3)
     LOAD 1025
     ADDI 3                  # Copying PC to M(1025) must be third last instruction
-    STOREIN 2 7
+    STOREIN 2 12
     MOVE in2 acc
-    ADDI 8                  # finally update Stack-Pointer
+    ADDI 13                  # finally update Stack-Pointer
     MOVE acc in2
 
     # 6. Save Adress of first Argument to M(0) and IN1, just for QOL
@@ -101,22 +111,32 @@ CALL_RESOTRE_REGS:
     LOADI 0
     STORE 1026              # Reset Arg count to Zero
     LOADIN 2 -3
-    STORE 4
+    STORE 9
     LOADIN 2 -4
-    STORE 3
+    STORE 8
     LOADIN 2 -5
-    STORE 2
+    STORE 7
     LOADIN 2 -6
-    STORE 1
+    STORE 6
     LOADIN 2 -7
+    STORE 5
+    LOADIN 2 -8
+    STORE 4
+    LOADIN 2 -9
+    STORE 3
+    LOADIN 2 -10
+    STORE 2
+    LOADIN 2 -11
+    STORE 1
+    LOADIN 2 -12
     STORE 0
 
     # 5. Pop IN1 Pointer to IN1
-    LOADIN 2 -8
+    LOADIN 2 -13
     MOVE acc in1
 
     MOVE in2 acc
-    SUBI 8
+    SUBI 13
     MOVE acc in2
 
     # 6. Final Jump back to main program
@@ -133,12 +153,36 @@ PREPARE_STACK:
     LOADI 0
     STORE 1026              # Default Argument Amount is zero
 
-    # Fill M(0) to M(4) and IN1 with data (Otherwise Python error)
+    # Fill M(0) to M(4) and IN1 with data (Otherwise Emulator error)
     LOADI 0
     STORE 0
     STORE 1
     STORE 2
     STORE 3
     STORE 4
+    STORE 5
+    STORE 6
+    STORE 7
+    STORE 8
+    STORE 9
     MOVE acc in1
     JUMP SETUP
+
+###### STACK_DUMP ######
+STACK_DUMP:
+    MOVE IN2 ACC
+    STORE 1
+    MOVE ACC IN1
+STACK_DUMP_LOOP:
+    MOVE IN1 ACC
+    SUBI 2048
+    JUMPC <= STACK_DUMP_DONE
+    LOADIN 1 0
+    STORE 0
+    PRINT 0
+    MOVE IN1 ACC
+    SUBI 1
+    MOVE ACC IN1
+    JUMP STACK_DUMP_LOOP
+STACK_DUMP_DONE:
+    JUMP 0

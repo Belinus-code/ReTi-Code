@@ -1,17 +1,28 @@
 # LINOX
+## Memory Architecture
+ - 0000 - 0009: Working Registers (automatic copy to stack on function-call)
+ - 0100 - 0227: Ascii Lookup Table (M(100+ord(X)) = ord(X))
+ - 1024 - 2047: Calling a Method
+ - 2048 - 4094: Global Stack
+ - 4095 - XXXX: Heap
 ## Stack
 1. Stack starts at M(2048)
 2. Stack Pointer is *always* at IN2
 3. Stack Pointer always points to next free cell
 4. Stack grows upwards (Pointer gets bigger)
 
+## STACK_DUMP
+ - Not a Method, rather a last Resort Label
+ - Loads Stack Pointer, Prints everything starting at stack top
+ - Goes until 2048 for now, on multithread system for later not sure
+
 ## CALL
 ### Stack Build:
 - M(IN2-1): Absolute Return Adress of Callee
 - M(IN2-2): Amount of Arguments for this Method on Stack 
 - M(IN2-3) to M(IN2-(2+n)): Arguments
-- M(IN2-(3+n)) to M(IN2-(8+n)): Copy of M(0) to M(4) of Callee
-- M(IN2-(9+n)): IN1 Register of Callee
+- M(IN2-(3+n)) to M(IN2-(13+n)): Copy of M(0) to M(9) of Callee
+- M(IN2-(14+n)): IN1 Register of Callee
 
 ### Calling a Method
 - Amount of Argument or Return Values (use bigger one) are to be stored at M(1026)
@@ -34,6 +45,7 @@
     - M(H+1): Is Frame used? (0: not used, 1: used)
     - M(H+2) to M(H+2+n)
     - M(H+3+n): Length of Heap Frame (n+3)
+- Heap Block size is currently limited to 1GB (=1.073.741.824) (to protect pyhton emulator and simulate a 32-Bit system)
 - Last Block of Heap cannot be unused. Lower Heap-Top Pointer in this case
 - Heap grows upwards
 
@@ -77,6 +89,12 @@
 ### CALLOC(n)
 Same as Malloc(n) but filles complete Block with zeros.
 
+### SIZEOF(n)
+- Argument 1: Pointer to Heap Block Data (Heap Start +2)
+- Checks if Pointer points to Heap Block via Boundry check, Block_used label and size comparision
+- Returns usable Size
+- Jumps to SEGMENTATION_FAULT on Error
+
 # Strings
 - For easy Print, every Ascii Character is stored in M(<char value> + 100)
     - E.g.: a = M(197) because ord(a) = 97 -> 97 + 100 = 197
@@ -90,22 +108,25 @@ Same as Malloc(n) but filles complete Block with zeros.
     - Parsed Value will be at M(1030)
     - If Offset was provided, Offset from buffer-start to first character AFTER last digit is will be returned to M(1031)
 ## GET_LINE_WIDTH
+    - Argument Count for Call Method: 4
     - 1. Argument: Pointer to String
     - 2. Argument: Pointer to eof String
     - 3. Argument: Pointer to any Character of specific line
+    - 4. Argument: Set to Zero
     - Only whole Strings accecepted, no Gap-Strings (split string in two if needed)
     - If target character (third argument) points to newline, it is seen as the end of the current line
     - First Return Value is Amount of visable Characters in Line. -1 if Error
-    - Second Return Value is 1 if Line is first Line of String, otherwise 0
-    - Third Return Value is 1 if Line is last Line of String, otherwise 0
-    - If first Value is -1, second and third Return Value cannot be trusted
+    - Second Return Value is the Location of the target Character in this Line. 
+    - Third Return Value is 1 if Line is first Line of String, otherwise 0
+    - Fourth Return Value is 1 if Line is last Line of String, otherwise 0
+    - If first Value is -1, all the other Values cannot be trusted
 
 ## GET_CURSOR_POSITION
     - No input Arguments required, however three Return Arguments, so set amount to 3
     - First Return Value is y-coordinate, starting at 1 at the top of the screen
     - Second Return Value is x-coordinate, starting at 1 at the left side of the screen
     - Third Return Value is a Pointer to an Input-Buffer filled with Keyboard Input values which were
-      read during parsing. If there werent any additional Inputs, Pointer will be NULL (0)
+      read during parsing, zero terminated. If there werent any additional Inputs, Pointer will be NULL (0)
     - Warning! If Third Return Value is a real Pointer, you need to free it once dealed with the inputs!
 
 ## GET_SCREEN_SIZE
@@ -115,5 +136,36 @@ Same as Malloc(n) but filles complete Block with zeros.
     - Third Return Value is a Pointer to an Input-Buffer filled with Keyboard Input values which were
       read during parsing. If there werent any additional Inputs, Pointer will be NULL (0)
     - Warning! If Third Return Value is a real Pointer (!=0), you need to free it once dealed with the inputs!
+
+## MOVE_STRING_BUFFER_GAP:
+    - Arg Count: 5
+    - Arg 1: Pointer to String Buffer Start
+    - Arg 2: Pointer to Gap Start (first empty field)
+    - Arg 3: Pointer to Gap End (last empty field)
+    - Arg 4: Pointer to String Buffer End (last usable field)
+    - Arg 5: Amount of fields to move (positive->right, negativ->left)
+    Return Arguments:
+    - Arg 1: Is Move in Boundrys of Buffer? If Zero(=No), String will not be touched, return Args are correct
+    - Arg 2: New Gap Start Pointer
+    - Arg 3: New Gap End Pointer
+
+## GET_LINE_COUNT
+    - Arg Count: 3 (optional: 5)
+    - Arg 1: Pointer to String Start
+    - Arg 2: Pointer to String End
+    - Arg 3: Target-Pointer to char in String (Optional, otherwise set to zero)
+    - Arg 4 (opt): Gap-Start Pointer, points to first empty cell
+    - Arg 5 (opt): Gap-End Pointer, points to last empty cell
+    String must be complete String if Argcount is 3 (No Gap in String allowed)
+    - Return Arguments
+    - Arg 1: Amount of Total Lines in given String (starting at zero if string is empty, otherwise >= 1)
+    - Arg 2: Number of Line Target-Char is in (starting at Line 1), 0 if Target-Pointer is zero
+
+## GET_STRING_SIZE
+    - Arg Count: 1 (Optional 2)
+    - Arg 1: Pointer to String 
+    - Optional: Arg 2: Max Size of String
+    - Return Arg 1: Size of String without Zero-Terminator or Max Size
+    - Optional: Flag if Zero-Terminator within Max-Bounds (1 if so, 0 otherwise)
 
 

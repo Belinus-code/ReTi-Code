@@ -1,3 +1,16 @@
+#define STACK_SPACE 10
+#define STACK_BUFFER_POINTER -10
+#define STACK_ACT_CURSPOS -9
+#define STACK_WANTED_CURSPOS -8
+#define STACK_INBUF -7
+#define STACK_INBUFOF -6
+#define STACK_DEBUG1 -5
+#define STACK_DEBUG2 -4
+#define STACK_DEBUG3 -3
+#define STACK_DEBUG4 -2
+#define STACK_DEBUG5 -1
+
+
 JUMP PREPARE_STACK
 SETUP:
 JUMP ASCII_SETUP
@@ -6,6 +19,10 @@ ASCII_SETUP_RETURN:
 # --- SETUP ---
 LOADI 4095
 STORE 4095             # Initialisiere leeren Heap
+
+MOVE IN2 ACC
+ADDI STACK_SPACE
+MOVE ACC IN2            # Update Stack Pointer
 
 LOADI 1
 STORE 1026
@@ -17,15 +34,18 @@ MOVE pc acc
 STORE 1025
 JUMP CALL
 LOAD 1030
-STOREIN 2 0             # Store Pointer to String on Stack (BASE_PTR)
+STOREIN 2 STACK_BUFFER_POINTER      # Store Pointer to String on Stack (BASE_PTR)
 STORE 1                 # M(1) Is BASE_PTR
 STORE 2                 # M(2) Is GAP_START (On start equal to BASE_PTR)
 ADDI 31                 # Block size -1
 STORE 3                 # M(3) is GAP_END
 STORE 4                 # M(4) is BASE_END
-MOVE IN2 ACC
-ADDI 1
-MOVE ACC IN2            # Update Stack Pointer
+LOADI 1
+STOREIN 2 STACK_ACT_CURSPOS         # actual cursor pos
+STOREIN 2 STACK_WANTED_CURSPOS      # wished Cursor Position
+LOADI 0
+STOREIN 2 STACK_INBUF               # Pointer to input-Buffer (Null Pointer if none)
+STOREIN 2 STACK_INBUFOF             # Offset Amount of Input-Buffer
 
 # switch to secondary monitor
 PRINTC 127
@@ -49,79 +69,111 @@ PRINTC '2'
 PRINTC 'J'
 
 LOOP:
-LOAD 3                  # GAP_END
-SUB 2                   # - GAP_START
+LOAD 3                      # GAP_END
+SUB 2                       # - GAP_START
 JUMPC > READ_NEXT_CHAR
-# Realloc new Block
+# Realloc new Block.
 LOADI 10
-STORE 6                 # Amount to resize new BASE
-LOADI 2                 # 2 Arguments
+STORE 12                    # Amount to resize new BASE
+LOADI 2                     # 2 Arguments
 STORE 1026
-LOADIN 2 -1             # Load Heap pointer
-STORE 5                 # Keep old Pointer on M(5) for Reference calculation
-STORE 1030              # Heap Pointer to Args
-LOAD 4                  # BASE_END
-SUB 5                   # - BASE_PTR
-ADDI 1                  # Current BASE Size
-ADD 6                   # Increase size by M(6)
-STORE 1031              # New Base Size to Args
+LOADIN 2 STACK_BUFFER_POINTER             # Load Heap pointer
+STORE 11                    # Keep old Pointer on M(5) for Reference calculation
+STORE 1030                  # Heap Pointer to Args
+LOAD 4                      # BASE_END
+SUB 11                      # - BASE_PTR
+ADDI 1                      # Current BASE Size
+ADD 12                      # Increase size by M(6)
+STORE 1031                  # New Base Size to Args
 LOADI *REALLOC
 STORE 1024
 MOVE pc acc
 STORE 1025
 JUMP CALL
 LOAD 1030
-STOREIN 2 -1            # Store Pointer to String on Stack
-STORE 8
+STOREIN 2 STACK_BUFFER_POINTER            # Store Pointer to String on Stack
+STORE 1
+STORE 14
 # New Block realloced, now gotta move everything behind cursor after GAP_END
 
-LOAD 8
-SUB 5                   # This is offset from old to new Base
-STORE 7
-LOAD 8
-STOREIN 2 -1            # Update Base_ptr. not longer needed.
-LOAD 2                  # Gap Start
-ADD 7
-STORE 2                 # Update Gap Start
-LOAD 3                  # Gap End of old heap block
-ADD 7
-STORE 3                 # Update Gap Ende (before copy)
-LOAD 4                  # Base Ende
-ADD 7
-STORE 8                 # Store old Base End pointer
-ADD 6                   # Add size increase
-STORE 4                 # Update Base End ptr 
-STORE 10                # Copy Register for copy loop
+LOAD 14
+SUB 11                      # This is offset from old to new Base
+STORE 13
+LOAD 14
+STOREIN 2 STACK_BUFFER_POINTER      # Update Base_ptr. not longer needed.
+STORE 1
+LOAD 2                      # Gap Start
+ADD 13
+STORE 2                     # Update Gap Start
+LOAD 3                      # Gap End of old heap block
+ADD 13
+STORE 3                     # Update Gap Ende (before copy)
+LOAD 4                      # Base Ende
+ADD 13
+STORE 14                    # Store old Base End pointer
+ADD 12                      # Add size increase
+STORE 4                     # Update Base End ptr 
+STORE 16                    # Copy Register for copy loop
 
 COPY_LOOP:
-LOAD 8
+LOAD 14
 SUB 3
 JUMPC = COPY_LOOP_DONE
-LOAD 8
+LOAD 14
 MOVE ACC IN1
 LOADIN 1 0
-STORE 9
+STORE 15
 MOVE IN1 ACC
 SUBI 1
-STORE 8
-LOAD 10
+STORE 14
+LOAD 16
 MOVE ACC IN1
-LOAD 9
+LOAD 15
 STOREIN 1 0
 MOVE IN1 ACC
 SUBI 1
-STORE 10
+STORE 16
 JUMP COPY_LOOP
 
 COPY_LOOP_DONE:
-LOAD 10
+LOAD 16
 STORE 3                  # Update Gap End ptr
 
-##### READING INPUT!!!#####
+##### READING INPUT#####
+# Check if Input Buffer is Empty. If not, first clear and free the Input Buffer char by char
+LOADIN 2 STACK_INBUF
+STORE 5
+JUMPC = READ_NEXT_CHAR
+LOADIN 2 STACK_INBUFOF
+STORE 6
+ADD 6
+MOVE ACC IN1
+LOADIN 1 0
+STORE 0
+JUMPC = INPUT_BUF_EMPTY
+LOAD 6
+ADDI 1
+STOREIN 2 STACK_INBUFOF
+JUMP WORK_NEXT_CHAR
+INPUT_BUF_EMPTY:
+LOAD 5
+STORE 1030
+LOADI 1
+STORE 1026
+LOADI *FREE
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+LOADI 0
+STOREIN 2 STACK_INBUF
+STOREIN 2 STACK_INBUFOF
 
 READ_NEXT_CHAR:
 READ 0
 STORE 0
+LOAD 0
+WORK_NEXT_CHAR:
 SUBI 27
 JUMPC = END
 LOAD 0
@@ -140,19 +192,9 @@ SUB 4
 JUMPC != ENTER_NOT_LAST_CHAR
 PRINTC 113              # If pressed Enter, need to print 10 (Newline) after 13 (carry return)
 PRINTC 110
-
-LOADI 3
-STORE 1026              # Expect 3 Return arguments
-LOADI 0
-STORE 1030
-STORE 1031
-STORE 1032
-LOADI *GET_CURSOR_POSITION
-STORE 1024
-MOVE PC ACC
-STORE 1025
-JUMP CALL
-
+LOADI 1
+STOREIN 2 STACK_ACT_CURSPOS            # Actual Cursor Position
+STOREIN 2 STACK_WANTED_CURSPOS            # Wanted Cursor Position
 JUMP LOOP
 ENTER_NOT_LAST_CHAR:
 PRINTC 127
@@ -181,17 +223,43 @@ PRINTC 0
 LOAD 2
 SUBI 1
 STORE 2                 # Update gap_start
+LOADIN 2 STACK_ACT_CURSPOS             # Load old actual cursor pos
+SUBI 1
+STOREIN 2 STACK_ACT_CURSPOS            # Update Cursor Position
+STOREIN 2 STACK_WANTED_CURSPOS
+
+LOAD 2
 MOVE ACC IN1
 LOADIN 1 0              # Load deleted char. If it was /n, need to do further logic.
 SUB 110
 JUMPC != UPDATE_INLINE
+# Was \n. Calculate new cursor position
+
+LOADI 4
+STORE 1026
+LOAD  1
+STORE 1030
+LOAD  4
+STORE 1031
+LOAD  2
+STORE 1032
+LOADI 0
+STORE 1033
+LOADI *GET_LINE_WIDTH
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+LOAD 1031               # Length of new line
+STOREIN 2 STACK_ACT_CURSPOS
+STOREIN 2 STACK_WANTED_CURSPOS
+
+# Now adapt screen to deletet newline
 PRINTC 127
 PRINTC 191
-PRINTC 177              # This sequence deletes this line / moves line under this up by one line
+PRINTC 177              # This sequence deletes this line / moves lines under this up by one line
 PRINTC 127
-PRINTC 191
-PRINTC 149
-PRINTC 165              # This sequence moves cursor line up (now is at beginning of line)
+PRINTC 177               # Sequence to move cursor up one line and move screen down if needed
 # now move cursor to end of this line. need to count chars in line before gap_start
 # Call Reprint line to ensure everything up to cursor is placed
 LOAD 1
@@ -205,34 +273,125 @@ STORE 1024
 MOVE pc acc
 STORE 1025
 JUMP CALL
-JUMP UPDATE_INLINE
+# JUMP UPDATE_INLINE # Skip rest for now because of error
+# Before Restoring end of Line, make sure that the last visable Line is displayed correctly
+LOAD 1
+STORE 1030
+LOAD 4
+STORE 1031
 LOAD 2
+STORE 1033
 SUBI 1
-STORE 5                 # check_ptr
+STORE 1032
+LOAD 3
+STORE 1034
+LOADI 5
+STORE 1026
+LOADI *GET_LINE_COUNT
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+LOAD 1030
+STORE 7             # Total Amount of lines
+STOREIN 2 STACK_DEBUG1
+LOAD 1031
+STORE 8             # Current Line Index
+STOREIN 2 STACK_DEBUG2
 
-BACKSPACE_RETLINE_LOOP:
-LOAD 5
-MOVE ACC IN1
-SUB 1                   # - Base_ptr
+# Get Cursur Position for y-Level
+LOADI 3
+STORE 1026
+LOADI *GET_CURSOR_POSITION
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+LOAD 1030
+STORE 9             # Current y-Level from Top starting at 1
+STOREIN 2 STACK_DEBUG3
+LOAD 1032
+STOREIN 2 STACK_INBUF             # Place Input Buffer
+
+# Get Screen Heigth
+LOADI 3
+STORE 1026
+LOADI *GET_SCREEN_SIZE
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+LOAD 1030
+STOREIN 2 STACK_DEBUG4
+LOAD 8              # Index of Cursor
+SUB 9               # Y-Level of Cursor
+ADD 1030            # Height of Screen
+STORE 8
+STOREIN 2 STACK_DEBUG5
+# Check if Input buffer
+LOAD 1032
+JUMPC = BACKSPACE_NOSEC_INBUF
+# Input Buffer not empty. Check if there already is one in inputbuf
+LOADIN 2 STACK_INBUF
+JUMPC != BACKSPACE_SECINBUF1
+LOAD 1032
+STOREIN 2 STACK_INBUF
+JUMP BACKSPACE_NOSEC_INBUF
+BACKSPACE_SECINBUF1:
+LOADIN 2 STACK_INBUF
+STORE 1030
+LOAD 1032
+STORE 1031
+LOADI 1
+STORE 1026
+LOADI *MERGE_HEAP_STRINGS
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+LOAD 1030
+STOREIN 2 STACK_INBUF
+
+BACKSPACE_NOSEC_INBUF:
+# Now check if Line to print even exists
+LOAD 7
+SUB 8
 JUMPC < UPDATE_INLINE
-LOADIN 1 0              # Load char at this cell
-SUB 110                 # Check if this char is a newline
-JUMPC = UPDATE_INLINE
-PRINTC 127
-PRINTC 191
-PRINTC 167              # Sequence for Cursor right
-LOAD 5
-SUBI 1
-STORE 5
-JUMP BACKSPACE_RETLINE_LOOP
-
+# Exists, so print desired Line
+##### PRINT_EDGE_LINE #####
+# Arg 1: Pointer to Buffer start
+# Arg 2: Pointer to Buffer end
+# Arg 3: Line Index (starting at 1)
+# Arg 4: Flag whether to print at top (0) or bottom (1)
+# Arg 5: Gap Start
+# Arg 6: Gap End
+LOAD 1
+STORE 1030
+LOAD 4
+STORE 1031
+LOAD 8
+STORE 1032
+LOADI 1
+STORE 1033
+LOAD 2
+STORE 1034
+LOAD 3
+STORE 1035
+LOADI 6
+STORE 1026
+LOADI *PRINT_EDGE_LINE
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+JUMP UPDATE_INLINE
 
 CON_RETURN:
 LOAD 0
 SUBI 57419
 JUMPC != CON_ARLEFT
 # Check if cursor to left is allowed
-LOADIN 2 -1             # Load Base_ptr
+LOADIN 2 STACK_BUFFER_POINTER             # Load Base_ptr
 SUB 2                   # Subtract gap_start. If zero than cursor already is on first index. Do Nothing
 JUMPC >= READ_NEXT_CHAR # No need to check for resizing block, didn't touch block
 # Move Gap in Base
@@ -250,6 +409,10 @@ STOREIN 1 0
 LOAD 3
 SUBI 1
 STORE 3
+LOADIN 2 STACK_ACT_CURSPOS
+SUBI 1
+STOREIN 2 STACK_ACT_CURSPOS
+STOREIN 2 STACK_WANTED_CURSPOS
 # Now check if cursor is at beginning of line. Moved character is in M(5)
 LOAD 5
 SUB 110                 # Zero if char was newline
@@ -261,6 +424,24 @@ PRINTC 168
 JUMP LOOP
 #If cursor was at beginning of line, gotta move up and to end
 ARRLEFT_LINEUP:
+LOADI 4
+STORE 1026
+LOAD  1
+STORE 1030
+LOAD  4
+STORE 1031
+LOAD  2
+STORE 1032
+LOADI 0
+STORE 1033
+LOADI *GET_LINE_WIDTH
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+LOAD 1031               # Length of Line
+STOREIN 2 STACK_ACT_CURSPOS
+STOREIN 2 STACK_WANTED_CURSPOS
 PRINTC 127
 PRINTC 177               # Sequence to move cursor up one line and move screen down if needed
 PRINTC 127              # ESC (27 + 100)
@@ -320,6 +501,10 @@ STOREIN 1 0
 LOAD 2
 ADDI 1
 STORE 2
+LOADIN 2 STACK_ACT_CURSPOS
+ADDI 1
+STOREIN 2 STACK_ACT_CURSPOS
+STOREIN 2 STACK_WANTED_CURSPOS
 LOAD 5                  # character that got moved over gap
 SUB 110                 # Check if moved character was newline
 JUMPC = ARRRIGHT_LINEDOWN
@@ -331,20 +516,140 @@ JUMP LOOP
 ARRRIGHT_LINEDOWN:
 PRINTC 113
 PRINTC 110
+LOADI 1
+STOREIN 2 STACK_ACT_CURSPOS
+STOREIN 2 STACK_WANTED_CURSPOS
 JUMP UPDATE_INLINE
 
 CON_ARRIGHT:
+LOAD 0
+SUBI 57416
+JUMPC != CON_ARUP
+# Get Cursor Position and check if Line up is possible
+LOADI 4
+STORE 1026
+LOAD 1
+STORE 1030
+LOAD 4
+STORE 1031
+LOAD 2
+STORE 1032
+LOADI 0
+STORE 1033
+LOADI *GET_LINE_WIDTH
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+
+LOAD 1032
+SUBI 1
+JUMPC = READ_NEXT_CHAR      # If Line was first Line, line up not possible. 
+LOAD 1031
+ADDI 1                      # Account for Newline
+STORE 10
+LOADI 0
+SUB 10                      # leftshift means negative amount of shift
+STORE 1034                  # Amount to Move Gap
+LOAD 1
+STORE 1030
+LOAD 2
+STORE 1031
+LOAD 3
+STORE 1032
+LOAD 4
+STORE 1033
+LOADI 5
+STORE 1026
+LOADI *MOVE_STRING_BUFFER_GAP
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+
+LOAD 1031
+STORE 2                 # Update Gap start Buffer
+LOAD 1032
+STORE 3                 # Update Gap End Buffer
+# Now get Width of Line abouve
+LOADI 4
+STORE 1026
+LOAD 1
+STORE 1030
+LOAD 4
+STORE 1031
+LOAD 2
+STORE 1032
+LOADI 0
+STORE 1033
+LOADI *GET_LINE_WIDTH
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+LOAD 1030               # This is Line Width
+STORE 9
+
+# Now call M
+STORE 1030
+LOADIN 2 STACK_WANTED_CURSPOS            # This is wished Cursor Position
+STORE 1031
+LOADI 2
+STORE 1026
+LOADI *MIN
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL               # Call Min Method
+LOAD 1030               # This is gonna be new actual position
+STORE 8
+LOAD 9
+SUB 8                   # This is amount to move the cursor
+STORE 9
+
+LOADI 0
+SUB 9                       # leftshift means negative amount of shift
+STORE 1034                  # Amount to Move Gap
+LOAD 1
+STORE 1030
+LOAD 2
+STORE 1031
+LOAD 3
+STORE 1032
+LOAD 4
+STORE 1033
+LOADI 5
+STORE 1026
+LOADI *MOVE_STRING_BUFFER_GAP
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+
+# logical Cursor (gap start pointer) is at correct position
+# Now have to move Visual Cursor to the correct position
+# If the current line is one of the top three lines, move the Line
+# with the cursor to Line three, so that at least two lines are visable abouve
+
+
+CON_ARUP:
+NORMAL_CHAR:
 # Normal Char
 PRINTC 0                # Print char to screen
 # Now Save char in Heap
 LOAD 2                  # Gap_start ptr
 MOVE ACC IN1
 LOAD 0
-STOREIN 1 0
+STOREIN 1 0             # Store Character in Buffer
 
 LOAD 2
 ADDI 1
 STORE 2                 # Update Gap_start
+
+LOADIN 2 STACK_ACT_CURSPOS
+ADDI 1
+STOREIN 2 STACK_ACT_CURSPOS            # Update actual cursor position
+STOREIN 2 STACK_WANTED_CURSPOS            # Update wanted cursor position
 JUMP UPDATE_INLINE
 
 # If editing is done in between characters, its nessesary to update the rest of the line
@@ -402,7 +707,7 @@ REPRINT_LINE_LOOPBACK:
 LOAD 6
 MOVE ACC IN1
 SUB 1
-JUMPC <= REPRINT_LINE_ATBACK
+JUMPC < REPRINT_LINE_ATBACK
 LOADIN 1 0
 SUB 110                 # Check if char is newline
 JUMPC = REPRINT_LINE_ATBACK_NL
@@ -471,12 +776,12 @@ PRINTC 208
 
 
 
-LOADIN 2 -1
+LOADIN 2 STACK_BUFFER_POINTER
 STORE 0
 
 PRINT_STRING:
     LOAD 0             # Lade den Start-Pointer aus M(0)
-    MOVE acc in1       # Kopiere ihn nach IN1 (unser Basis-Register)
+    MOVE ACC IN1       # Kopiere ihn nach IN1 (unser Basis-Register)
 
 STRING_LOOP:
     LOADIN 1 0         # Lädt M(IN1 + M(1)) -> Also das aktuelle Zeichen
@@ -527,6 +832,33 @@ PRINTC 'O'
 PRINTC ':'
 PRINTC ' '
 PRINT 1031
+PRINTC 'P'
+PRINTC ':'
+PRINTC ' '
+LOADIN 2 STACK_ACT_CURSPOS
+STORE 10
+PRINT 10
+
+PRINTC "\nAmount of Lines: "
+LOADIN 2 STACK_DEBUG1
+STORE 0
+PRINT 0
+PRINTC "Current Line: "
+LOADIN 2 STACK_DEBUG2
+STORE 0
+PRINT 0
+PRINTC "Current y-Level: "
+LOADIN 2 STACK_DEBUG3
+STORE 0
+PRINT 0
+PRINTC "Screen Height: "
+LOADIN 2 STACK_DEBUG4
+STORE 0
+PRINT 0
+PRINTC "Printed Line Index: "
+LOADIN 2 STACK_DEBUG5
+STORE 0
+PRINT 0
 
 JUMP 0
 
@@ -625,6 +957,9 @@ JUMP RETURN
 GET_SCREEN_SIZE:
 PRINTC 127
 PRINTC '7'              # This saves Cursor position
+# ESC[?25l
+PRINTC 127
+PRINTC "[?25l"           # This makes Cursor invisible
 PRINTC 127
 PRINTC '['
 PRINTC '9'
@@ -649,6 +984,9 @@ STORE 1025
 JUMP CALL
 PRINTC 127
 PRINTC '8'              # Restore saved Cursor Position
+# ESC[?25h
+PRINTC 127
+PRINTC "[?25h"           # This makes Cursor visible
 LOAD 0
 MOVE ACC IN1
 LOAD 1030
@@ -804,6 +1142,7 @@ LOADIN 1 1
 STORE 2             # End of String
 LOADIN 1 2
 STORE 3             # Pointer to a char in specific line
+STORE 6             # Target Character relative Position
 LOADI 0            
 STORE 5
 LOADI 1
@@ -826,7 +1165,7 @@ JUMPC != GET_LINE_WIDTH_FIND_START
 # Target Char is newline, check if target char is first char of string:
 LOAD 3
 SUB 1
-JUMPC = GET_LINE_WIDTH_LOOP2
+JUMPC = GET_LINE_WIDTH_LOOP2S
 LOAD 3
 SUBI 1
 STORE 3
@@ -851,7 +1190,7 @@ JUMP GET_LINE_WIDTH_LOOP1
 GET_LINE_WIDTH_LOOP1E1:
 MOVE IN1 ACC
 STORE 3
-JUMP GET_LINE_WIDTH_LOOP2
+JUMP GET_LINE_WIDTH_LOOP2S
 
 GET_LINE_WIDTH_LOOP1E2:
 MOVE IN1 ACC
@@ -861,6 +1200,11 @@ STORE 3
 LOADI 0
 STORE 4             # Clear Flag that Line is first line of String
 
+GET_LINE_WIDTH_LOOP2S:
+LOAD 6
+SUB 3
+ADDI 1
+STORE 6
 
 GET_LINE_WIDTH_LOOP2:
 MOVE IN1 ACC
@@ -895,10 +1239,12 @@ LOAD 0
 MOVE ACC IN1
 LOAD 3
 STOREIN 1 0
-LOAD 4
+LOAD 6
 STOREIN 1 1
-LOAD 5
+LOAD 4
 STOREIN 1 2
+LOAD 5
+STOREIN 1 3
 JUMP RETURN
 
 # In an Event of an Error, return -1
@@ -908,6 +1254,517 @@ MOVE ACC IN1
 LOADI -1
 STOREIN 1 0
 JUMP RETURN
+
+##### MOVE_STRING_BUFFER_GAP #####
+MOVE_STRING_BUFFER_GAP:
+STORE 8             # Store Stack Pointer on 8
+LOADIN 1 0
+STORE 0             # Buffer Start
+LOADIN 1 1
+STORE 1             # Gap Start
+LOADIN 1 2
+STORE 2             # Gap End
+LOADIN 1 3
+STORE 3             # Buffer End
+LOADIN 1 4
+STORE 4             # Amount to move
+JUMPC = MOVE_STRING_BUFFER_GAP_DONE
+JUMPC < MOVE_STRING_BUFFER_GAP_NEG
+JUMP MOVE_STRING_BUFFER_GAP_POS
+
+MOVE_STRING_BUFFER_GAP_NEG:
+LOAD 1
+ADD 4               # Amount is negative, so add to Subtract
+STORE 6             # M(6) now holds the end Value to compare loop against
+SUB 0
+JUMPC < MOVE_STRING_BUFFER_GAP_IMP
+MOVE_STRING_BUFFER_GAP_NEG_LOOP:
+LOAD 1
+SUBI 1
+STORE 1
+MOVE ACC IN1
+LOADIN 1 0
+STORE 7
+LOAD 2
+MOVE ACC IN1
+LOAD 7
+STOREIN 1 0
+MOVE IN1 ACC
+SUBI 1
+STORE 2
+STOREIN 1 0
+LOAD 1
+SUB 6
+JUMPC <= MOVE_STRING_BUFFER_GAP_DONE
+JUMP MOVE_STRING_BUFFER_GAP_NEG_LOOP
+
+MOVE_STRING_BUFFER_GAP_POS:
+LOAD 2
+ADD 4
+STORE 6
+SUB 3
+JUMPC > MOVE_STRING_BUFFER_GAP_IMP
+MOVE_STRING_BUFFER_GAP_POS_LOOP:
+LOAD 2
+ADDI 1
+STORE 2
+MOVE ACC IN1
+LOADIN 1 0
+STORE 7
+LOAD 1
+MOVE ACC IN1
+LOAD 7
+STOREIN 1 0
+MOVE IN1 ACC
+ADDI 1
+STORE 1
+LOAD 2
+SUB 6
+JUMPC >= MOVE_STRING_BUFFER_GAP_DONE
+JUMP MOVE_STRING_BUFFER_GAP_POS_LOOP
+
+MOVE_STRING_BUFFER_GAP_IMP:
+LOAD 8
+MOVE ACC IN1
+LOADI 0
+STOREIN 1 0
+LOAD 1
+STOREIN 1 1
+LOAD 2
+STOREIN 1 2
+JUMP RETURN
+
+MOVE_STRING_BUFFER_GAP_DONE:
+LOAD 8
+MOVE ACC IN1
+LOADI 1
+STOREIN 1 0
+LOAD 1
+STOREIN 1 1
+LOAD 2
+STOREIN 1 2
+JUMP RETURN
+
+
+##### GET_LINE_COUNT #####
+GET_LINE_COUNT:
+LOADIN 1 0
+STORE 1             # Buffer Start
+STORE 4
+STORE 5
+LOADIN 1 1
+STORE 2             # Buffer End
+LOADIN 1 2
+STORE 3             # Target Character
+LOADIN 2 -2         # Amount of Arguments
+SUBI 3              
+JUMPC = 5           # If count is 3, skip loading last two args and handle string as 
+                    # As a non interrupted String
+LOADIN 1 3
+STORE 4
+LOADIN 1 4
+STORE 5
+LOADI 0
+STORE 6             # Total Line count
+STORE 7             # Target Line Counter
+LOAD 1
+MOVE ACC IN1
+LOADIN 1 0
+JUMPC = GET_LINE_COUNT_DONE
+LOADI 1
+STORE 6             # Total Line count
+STORE 7             # Target Line Counter
+
+GET_LINE_COUNT_LOOP:
+LOAD 1
+MOVE ACC IN1
+LOADIN 1 0          # Load character
+STORE 8
+JUMPC = GET_LINE_COUNT_DONE # If char is zero Terminator, string is finished
+SUB 110
+JUMPC != 4
+LOAD 6
+ADDI 1
+STORE 6
+LOAD 3
+SUB 1
+JUMPC != 3
+LOAD 6
+STORE 7             # If Char is target char, copy line count
+MOVE IN1 ACC
+ADDI 1
+STORE 1
+SUB 2               # Check if Pointer is bigger than buffer end
+JUMPC > GET_LINE_COUNT_DONE
+LOAD 1
+SUB 4               # Check if Pointer is on Gap Start
+JUMPC != GET_LINE_COUNT_LOOP
+LOAD 5
+ADDI 1
+STORE 10
+SUB 2               # Check if Pointer is bigger than buffer end
+JUMPC > GET_LINE_COUNT_DONE
+LOAD 10
+STORE 1
+JUMP GET_LINE_COUNT_LOOP
+
+GET_LINE_COUNT_DONE:
+LOAD 0
+MOVE ACC IN1
+LOAD 6
+STOREIN 1 0
+LOAD 7
+STOREIN 1 1
+JUMP RETURN
+
+##### PRINT_LINE #####
+# Arg 1: String Buffer Start
+# Arg 2: String Buffer End
+# Arg 3: Line Index (starting at 1)
+# Arg 4: Gap Start (first empty cell)
+# Arg 5: Gap End (last empty cell)
+PRINT_LINE:
+LOADIN 1 0
+STORE 1             # String Buffer
+LOADIN 1 1
+STORE 2             # String Buffer End
+LOADIN 1 3
+STORE 5             # Gap Start
+LOADIN 1 4
+STORE 6             # Gap End
+LOADIN 1 2          # Line Index
+SUBI 1
+JUMPC = PRINT_LINE_PRINT_INIT
+STORE 3             # Line Counter
+
+LOAD 1
+MOVE ACC IN1
+
+PRINT_LINE_FIND_LOOP:
+# --- GAP CHECK ---
+MOVE IN1 ACC
+SUB 5               # Current Pointer - Gap Start
+JUMPC != PRINT_LINE_FIND_NO_SKIP
+LOAD 6
+ADDI 1
+MOVE ACC IN1        # Skip to Gap End + 1
+PRINT_LINE_FIND_NO_SKIP:
+
+# --- BOUNDS CHECK ---
+MOVE IN1 ACC
+SUB 2
+JUMPC > RETURN
+
+LOADIN 1 0
+STORE 4
+
+MOVE IN1 ACC
+ADDI 1
+MOVE ACC IN1 
+
+LOAD 4
+SUB '\n'            
+JUMPC != PRINT_LINE_FIND_LOOP
+LOAD 3
+SUBI 1
+STORE 3
+JUMPC > PRINT_LINE_FIND_LOOP
+
+JUMP PRINT_LINE_PRINT_LOOP
+
+
+PRINT_LINE_PRINT_INIT:
+LOAD 1
+MOVE ACC IN1
+
+PRINT_LINE_PRINT_LOOP:
+# --- GAP CHECK ---
+MOVE IN1 ACC
+SUB 5               # Current Pointer - Gap Start
+JUMPC != PRINT_LINE_PRINT_NO_SKIP
+LOAD 6
+ADDI 1
+MOVE ACC IN1        # Skip to Gap End + 1
+PRINT_LINE_PRINT_NO_SKIP:
+
+# --- BOUNDS CHECK ---
+MOVE IN1 ACC
+SUB 2
+JUMPC > RETURN
+
+LOADIN 1 0
+STORE 4
+
+MOVE IN1 ACC
+ADDI 1
+MOVE ACC IN1 
+
+LOAD 4
+SUB '\n'
+JUMPC = RETURN
+
+PRINTC 4
+JUMP PRINT_LINE_PRINT_LOOP
+
+
+##### PRINT_EDGE_LINE #####
+# Arg 1: Pointer to Buffer start
+# Arg 2: Pointer to Buffer end
+# Arg 3: Line Index (starting at 1)
+# Arg 4: Flag whether to print at top (0) or bottom (1)
+# Arg 5: Gap Start
+# Arg 6: Gap End
+PRINT_EDGE_LINE:
+LOADIN 1 0
+STORE 1             # Buffer start
+LOADIN 1 1
+STORE 2             # Buffer end
+LOADIN 1 2
+STORE 3             # Line Index
+LOADIN 1 3
+STORE 4             # Flag
+LOADIN 1 4
+STORE 5             # Gap Start
+LOADIN 1 5
+STORE 6             # Gap End
+
+PRINTC 127
+PRINTC '7'          # Save Cursor position
+
+LOAD 4
+JUMPC = PRINT_EDGE_LINE_TOP
+PRINTC 127
+PRINTC '['
+PRINTC '9'
+PRINTC '9'
+PRINTC '9'
+PRINTC ';'
+PRINTC '1'
+PRINTC 'f'          # Move cursor to bottom left corner
+JUMP PRINT_EDGE_LINE_PRINT
+
+PRINT_EDGE_LINE_TOP:
+PRINTC 127
+PRINTC '['
+PRINTC 'H'          # Move cursor to top left corner
+
+PRINT_EDGE_LINE_PRINT:
+LOAD 1
+STORE 1030
+LOAD 2
+STORE 1031
+LOAD 3
+STORE 1032
+LOAD 5
+STORE 1033          # Gap Start übergeben
+LOAD 6
+STORE 1034          # Gap End übergeben
+
+LOADI 5             # 5 Argumente!
+STORE 1026
+LOADI *PRINT_LINE
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
+
+PRINTC 127
+PRINTC '8'          # Restore saved Cursor Position
+JUMP RETURN
+
+###### GET_STRING_SIZE ######
+GET_STRING_SIZE:
+LOADI 0
+STORE 3                 # Counter for Size
+STORE 4                 # Flag if Max-size if given
+LOADIN 1 0
+STORE 1
+LOADIN 2 -2             # Load Arg Count
+SUBI 1
+JUMPC = GET_STRING_SIZE_NO_LIMIT
+LOADI 1
+STORE 4                 # Set Flag
+LOADIN 1 1
+ADD 1
+SUBI 1
+STORE 2                 # Last Cell within String
+LOAD 1
+MOVE ACC IN1
+
+GET_STRING_SIZE_LOOP1:
+LOADIN 1 0
+JUMPC = GET_STRING_SIZE_DONE
+MOVE IN1 ACC
+ADDI 1
+MOVE ACC IN1
+STORE 5
+LOAD 4
+JUMPC = GET_STRING_SIZE_SKIP_LIMIT_CHECK
+LOAD 5
+SUB 2
+JUMPC > GET_STRING_SIZE_ERR
+GET_STRING_SIZE_SKIP_LIMIT_CHECK:
+LOAD 3
+ADDI 1
+STORE 3
+JUMP GET_STRING_SIZE_LOOP1
+
+GET_STRING_SIZE_NO_LIMIT:
+LOAD 1
+MOVE ACC IN1
+GET_STRING_SIZE_LOOP2:
+LOADIN 1 0
+JUMPC = GET_STRING_SIZE_DONE
+MOVE IN1 ACC
+ADDI 1
+MOVE ACC IN1
+LOAD 3
+ADDI 1
+STORE 3
+JUMP GET_STRING_SIZE_LOOP2
+
+GET_STRING_SIZE_DONE:
+LOAD 0
+MOVE ACC IN1
+LOAD 3
+STOREIN 1 0
+LOAD 4
+JUMPC = RETURN
+LOADI 1
+STOREIN 1 1
+JUMP RETURN
+
+GET_STRING_SIZE_ERR:
+LOAD 0
+MOVE ACC IN1
+LOADIN 1 1
+STOREIN 1 0         # Copy Max Size as return arg
+LOADI 0
+STOREIN 1 1
+JUMP RETURN
+
+###### STRCAT ######
+STRCAT:
+    LOADIN 1 0
+    STORE 1             # Pointer to Main String
+    LOADIN 1 1
+    STORE 2             # Pointer to Secondary String
+    LOAD 1
+    MOVE ACC IN1
+SRTCAT_LOOP1:
+    LOADIN 1 0
+    JUMPC = STRCAT_FIRST_ZERO
+    MOVE IN1 ACC
+    ADDI 1
+    MOVE ACC IN1
+    JUMP SRTCAT_LOOP1
+STRCAT_FIRST_ZERO:
+    MOVE IN1 ACC
+    STORE 1
+STRCAT_LOOP2:
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 0
+    JUMPC = RETURN
+    STORE 3
+    LOAD 1
+    MOVE ACC IN1
+    LOAD 3
+    STOREIN 1 0
+    MOVE IN1 ACC
+    ADDI 1
+    STORE 1
+    JUMP STRCAT_LOOP2
+
+##### MERGE_HEAP_STRINGS #####
+MERGE_HEAP_STRINGS:
+    LOADIN 1 0
+    STORE 1
+    LOADIN 1 1
+    STORE 2
+    SUB 1
+    JUMPC = EXCEPTION       # In Case both Strings are the same
+    LOAD 1
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *GET_STRING_SIZE
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    STORE 3
+
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *GET_STRING_SIZE
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    ADD 3
+    ADDI 1              # For Zero Terminator
+    STORE 3             # M(3) holds needed size
+
+    LOAD 1
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SIZEOF
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    SUB 3
+    JUMPC >= MERGE_HEAP_STRINGS_NOMAL
+    # Need to realloc Main Buffer
+    LOAD 1
+    STORE 1030
+    LOAD 3
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *REALLOC
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    STORE 1
+MERGE_HEAP_STRINGS_NOMAL:
+    LOAD 1
+    STORE 1030
+    LOAD 2
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *STRCAT
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    # Now Free secondary Buffer
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *FREE
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 0
+    JUMP RETURN
+
+
 
 
 
