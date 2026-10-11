@@ -46,6 +46,11 @@ STOREIN 2 STACK_WANTED_CURSPOS      # wished Cursor Position
 LOADI 0
 STOREIN 2 STACK_INBUF               # Pointer to input-Buffer (Null Pointer if none)
 STOREIN 2 STACK_INBUFOF             # Offset Amount of Input-Buffer
+STOREIN 2 STACK_DEBUG1
+STOREIN 2 STACK_DEBUG2
+STOREIN 2 STACK_DEBUG3
+STOREIN 2 STACK_DEBUG4
+STOREIN 2 STACK_DEBUG5
 
 # switch to secondary monitor
 PRINTC 127
@@ -628,8 +633,9 @@ JUMP CALL
 
 # logical Cursor (gap start pointer) is at correct position
 # Now have to move Visual Cursor to the correct position
-# If the current line is one of the top three lines, move the Line
-# with the cursor to Line three, so that at least two lines are visable abouve
+PRINTC 127
+PRINTC 'M'                  # Cursor one line up, scroll if needed
+
 
 
 CON_ARUP:
@@ -952,6 +958,9 @@ ATOI_NO_OFFSET_RET:
 LOAD 4
 STOREIN 1 0
 JUMP RETURN
+
+###### ITOA METHOD ######
+LOAD
 
 ###### GET_SCREEN_SIZE METHOD ######
 GET_SCREEN_SIZE:

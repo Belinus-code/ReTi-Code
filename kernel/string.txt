@@ -1,7 +1,7 @@
 
 
-JUMP 1617
-JUMP 2120
+JUMP 1622
+JUMP 2125
 
 # --- SETUP ---
 LOADI 4095
@@ -15,11 +15,11 @@ LOADI 1
 STORE 1026
 LOADI 32               # Alloc 32 Cells for Beginning
 STORE 1030
-LOADI 1987
+LOADI 1992
 STORE 1024
 MOVE pc acc
 STORE 1025
-JUMP 1495
+JUMP 1500
 LOAD 1030
 STOREIN 2 -10      # Store Pointer to String on Stack (BASE_PTR)
 STORE 1                 # M(1) Is BASE_PTR
@@ -33,6 +33,11 @@ STOREIN 2 -8      # wished Cursor Position
 LOADI 0
 STOREIN 2 -7               # Pointer to input-Buffer (Null Pointer if none)
 STOREIN 2 -6             # Offset Amount of Input-Buffer
+STOREIN 2 -5
+STOREIN 2 -4
+STOREIN 2 -3
+STOREIN 2 -2
+STOREIN 2 -1
 
 # switch to secondary monitor
 PRINTC 127
@@ -601,9 +606,6 @@ JUMP 986
 # Now have to move Visual Cursor to the correct position
 # If the current line is one of the top three lines, move the Line
 # with the cursor to Line three, so that at least two lines are visable abouve
-
-
-
 
 
 # Normal Char
@@ -1919,7 +1921,7 @@ STORE 7
 STORE 8
 STORE 9
 MOVE acc in1
-JUMP -1634
+JUMP -1639
 
 ###### STACK_DUMP ######
 MOVE IN2 ACC
@@ -2512,7 +2514,7 @@ SUBI 100
 STOREIN 1 0
 SUBI 127
 JUMPC < -7
-JUMP -2129
+JUMP -2134
 
 ###### MIN METHOD ######
 LOADIN 1 0              # IN1 is Frame-Pointer because Call Method puts it there
