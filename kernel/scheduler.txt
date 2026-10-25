@@ -1,0 +1,2001 @@
+JUMP 328          
+JUMP 904        
+
+# --- SETUP ---
+LOADI 4095
+STORE 4095             # Initialisiere leeren Heap
+
+
+
+
+    # Prepare
+    LOADI 1
+    STORE 1000             # Set PID to KERNEL_ENTRY
+    STORE 1002              # Set Amount of Processes to 1
+
+    # Create Boot-Stack
+    LOADI 256               # Currently this supports a call-depth of ~20
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 356    
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 206 
+    LOAD 1030               # <-- Boot-Stack Pointer
+    STORE 1004
+    MOVE ACC IN2
+
+    # Create Process-Controll-Block for Kernel
+    LOADI 8
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 344    
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 194 
+
+    # Fill PCB with Kernel-Data
+    LOAD 1030
+    STORE 1001                  # Current PCB is this new one
+    STORE 1003                  # Kernel PCV is this new one
+    MOVE ACC IN1
+    STOREIN 1 0          # NEXT_PCB is this Block itself
+    STOREIN 1 1          # PREV_PCB is also this Block itself
+    LOADI 1
+    STORE 1002                  # Amount of Processes, currently only Kernel
+    STOREIN 1 2           # Store PID on PCB
+    LOADI 0
+    STOREIN 1 4   # No Wait reason
+    STOREIN 1 5     # No Wait Data
+    STOREIN 1 3         # Store 182-State on PCB
+    STOREIN 1 3         # Store 201-State on PCB
+    STOREIN 1 3         # Store 197-State on PCB
+    STOREIN 1 3         # Store 200-State on PCB
+    STOREIN 1 3         # Store 221-State on PCB
+    MOVE IN2 ACC
+    STOREIN 1 6     # Current Stack pointer (refresh on Process switch!)
+    LOADI 2048
+    STOREIN 1 7        # Stack Base
+
+    LOAD 1003                   # Kernel PCB
+    STORE 1030
+    LOADI 986                   # Relative Offset to Kernel-Entry
+    STORE 1
+    MOVE PC ACC                 # Current Adress
+    STORE 2
+    LOAD 1
+    ADD 2
+    SUBI 2
+    STORE 1031
+    LOADI 0
+    STORE 1032
+    LOADI 3
+    STORE 1026
+    LOADI 21                              
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 154 
+
+    # Switch to Kernel Stack
+    LOAD 1001
+    MOVE ACC IN1
+    LOADIN 1 6
+    MOVE ACC IN2
+
+    # Now call Free-Method on Kernel Stack
+    LOAD 1004
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 380  
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 141 
+    LOADI 0
+    STORE 1004
+
+    # Call Return and hope for the best
+    JUMP 193                    # Due to manipulated Kernel stack, this should take execution to KERNEL_ENTRY
+
+
+    LOADIN 1 0                  # Pointer to PCB
+    STORE 1
+    LOADIN 1 1                  # Absolute Adress of Process Entry point
+    STORE 2
+    LOADIN 1 2                  # Amount of Process-Arguments
+    STORE 3
+
+    # Process-Stack is empty. Load Stack-Base and imitate Call-Frame
+    LOAD 1
+    MOVE ACC IN1
+    LOADIN 1 7
+    MOVE ACC IN1                # Pointer to Stack
+
+    # Fill IN1 and Working Registers with Zero
+    LOADI 0
+    STOREIN 1 0                 # IN1-Copy
+    STOREIN 1 1                 # M(0)-Copy
+    STOREIN 1 2
+    STOREIN 1 3
+    STOREIN 1 4
+    STOREIN 1 5
+    STOREIN 1 6
+    STOREIN 1 7
+    STOREIN 1 8
+    STOREIN 1 9
+    STOREIN 1 10                # M(9)-Copy
+    MOVE IN1 ACC
+    ADDI 11
+    STORE 4                     # Pointer to new Stack
+
+    # Copy Process-Arguments
+    LOAD 0
+    ADDI 3
+    STORE 5                     # Pointer to arguments on own Stack
+
+    LOAD 3
+    STORE 7                     # Copy of Arg-Count
+
+    LOAD 7                      # Amount of Args
+    JUMPC <= 18                                  
+    SUBI 1
+    STORE 7
+    LOAD 5
+    MOVE ACC IN1
+    LOADIN 1 0
+    STORE 6                     # Argument is on M(6)
+    MOVE IN1 ACC
+    ADDI 1
+    STORE 5
+
+    LOAD 4                      # Pointer to stack
+    MOVE ACC IN1
+    LOAD 6
+    STOREIN 1 0
+    MOVE IN1 ACC
+    ADDI 1
+    STORE 4
+    JUMP -18                                 
+
+    # Copy of Arguments is done.
+    LOAD 4
+    MOVE ACC IN1                # Points to new Stack
+    LOAD 3
+    STOREIN 1 0                 # Amount of Arguments
+    LOAD 2
+    STOREIN 1 1                 # Absolute Adress of Process Entry Point
+    MOVE IN1 ACC
+    ADDI 2
+    STORE 4                     # New Stack Pointer for PCB!
+
+    LOAD 1
+    MOVE ACC IN1
+    LOAD 4
+    STOREIN 1 6
+    JUMP 130   
+
+
+
+    LOAD 1001
+    STORE 2                     # M(2) holds old PCB
+    MOVE ACC IN1
+    MOVE IN2 ACC
+    STOREIN 1 6
+    LOADIN 1 3
+    SUBI 1
+    JUMPC != 3
+    LOADI 0
+    STOREIN 1 3
+
+    # Check if Procces terminated itself
+    LOADIN 1 3
+    SUBI 3
+    STORE 6                     # M(0) holds flag for Termination
+    # Now goto next Process
+    LOAD 1001
+    MOVE ACC IN1
+    LOADIN 1 0
+    STORE 1                     # Pointer to PCB
+    LOAD 1
+    MOVE ACC IN1
+    LOADIN 1 3
+    SUBI 0
+    JUMPC != 50             
+    LOAD 1
+    STORE 1001                  # Update PCB Pointer
+    LOADIN 1 2
+    STORE 1000                  # Update PID
+    LOADI 1
+    STOREIN 1 3
+    LOADIN 1 6
+    MOVE ACC IN2
+
+    # Before Jumping back to process, check if old Process terminated
+    LOAD 6
+    JUMPC != 98    
+    # Needs to be terminated
+    # remove this PCB out of Linked List:
+    LOAD 1000
+    STORE 3                     # Store current PID
+    LOADI 1
+    STORE 1000                  # Switch to Kernel-Mode
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 0
+    STORE 4
+    LOADIN 1 1
+    STORE 5
+    MOVE ACC IN1
+    LOAD 4
+    STOREIN 1 0
+    MOVE ACC IN1
+    LOAD 5
+    STOREIN 1 1
+
+    # Free terminated Stack
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 7
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 255  
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 16  
+
+    # Free terminated PCB
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 246  
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 7   
+    LOAD 3
+    STORE 1000
+    JUMP 59    
+
+    LOADIN 1 0
+    STORE 1
+    JUMP -56       
+
+
+###### CALL METHOD ######
+    # 1. Save IN1 to Stack
+    MOVE IN1 acc
+    STOREIN 2 0             # Dont Increse Stack now to save code
+
+    # 2. Save M(0) to M(4) to stack
+    LOAD 0
+    STOREIN 2 1             # Manuell Increment of Stack to save Code
+    LOAD 1
+    STOREIN 2 2
+    LOAD 2
+    STOREIN 2 3
+    LOAD 3
+    STOREIN 2 4
+    LOAD 4
+    STOREIN 2 5             # Stack +6
+    LOAD 5
+    STOREIN 2 6             # Manuell Increment of Stack to save Code
+    LOAD 6
+    STOREIN 2 7
+    LOAD 7
+    STOREIN 2 8
+    LOAD 8
+    STOREIN 2 9
+    LOAD 9
+    STOREIN 2 10             # Stack +11
+
+    # 3. Copy n Arguments to stack
+    LOADI 0
+    STORE 1027              # Use 1027 as loop counter (i)
+    LOAD 1026               # Load arg count (n)
+    SUB 1027
+    JUMPC <= 13             # If i >= n, continue
+    LOADI 1030
+    ADD 1027                # Address: 1030 + i
+    MOVE acc IN1
+    LOADIN 1 0              # Load argument from transfer area
+    STOREIN 2 11             # Push to stack
+    MOVE in2 acc            # Increment stack pointer
+    ADDI 1
+    MOVE acc in2
+    LOAD 1027               # Increment loop counter
+    ADDI 1
+    STORE 1027
+    JUMP -14               
+
+# 4. Save Amount of Args (n) to Stack
+    LOAD 1026               # M (1026) is arg count
+    STOREIN 2 11
+
+    # 5. Save Absolute Return Address to Stack (PC_ref + 3)
+    LOAD 1025
+    ADDI 3                  # Copying PC to M(1025) must be third last instruction
+    STOREIN 2 12
+    MOVE in2 acc
+    ADDI 13                  # finally update Stack-Pointer
+    MOVE acc in2
+
+    # 6. Save Adress of first Argument to M(0) and IN1, just for QOL
+    SUBI 2                  # Stack-Counter - 2 Points to arg_count
+    SUB 1026                # Now points to first Argument
+    MOVE acc IN1
+    STORE 0
+
+    # 7. Jump to Absolute Method Address (Offset + PC_ref - 2)
+    LOAD 1025
+    ADD 1024
+    SUBI 2
+    MOVE acc pc
+
+###### RETURN METHOD ######
+# Not as much comments because same as call just reverse
+    # 1. Pop Return Address to M(1024)
+    LOADIN 2 -1             # Pop from stack
+    STORE 1024
+
+    # 2. Pop Arg count to M(1026)
+    LOADIN 2 -2
+    STORE 1026
+
+    # 3. Pop Arguments from Stack to M(1030)...
+    LOADI 1030
+    ADD 1026
+    SUBI 1
+    STORE 1025              # Target pointer
+
+    LOAD 1026
+    JUMPC <= 14               
+    SUBI 1
+    STORE 1026
+    LOAD 1025
+    MOVE acc IN1
+    MOVE in2 acc            # Decrement stack pointer (Pop)
+    SUBI 1
+    MOVE acc in2
+    LOADIN 2 -2
+    STOREIN 1 0             # Store return value back to transfer area
+    LOAD 1025
+    SUBI 1
+    STORE 1025
+    JUMP -14            
+
+# 4. Restore M(4) down to M(0) (Reverse order)
+    LOADI 0
+    STORE 1026              # Reset Arg count to Zero
+    LOADIN 2 -3
+    STORE 9
+    LOADIN 2 -4
+    STORE 8
+    LOADIN 2 -5
+    STORE 7
+    LOADIN 2 -6
+    STORE 6
+    LOADIN 2 -7
+    STORE 5
+    LOADIN 2 -8
+    STORE 4
+    LOADIN 2 -9
+    STORE 3
+    LOADIN 2 -10
+    STORE 2
+    LOADIN 2 -11
+    STORE 1
+    LOADIN 2 -12
+    STORE 0
+
+    # 5. Pop IN1 Pointer to IN1
+    LOADIN 2 -13
+    MOVE acc IN1
+
+    MOVE in2 acc
+    SUBI 13
+    MOVE acc in2
+
+    # 6. Final Jump back to main program
+    LOAD 1024
+    MOVE acc pc
+
+###### PREPARE STACK ######
+    # Prepare Stack
+    LOADI 2048              # Stack beginns at 2048
+    MOVE acc in2            # IN2 is always Stackpointer
+    LOADI 4095
+    STORE 4095              # Store Heap Top Pointer
+    LOADI 0
+    STORE 1026              # Default Argument Amount is zero
+
+    # Fill M(0) to M(4) and IN1 with data (Otherwise Emulator error)
+    LOADI 0
+    STORE 0
+    STORE 1
+    STORE 2
+    STORE 3
+    STORE 4
+    STORE 5
+    STORE 6
+    STORE 7
+    STORE 8
+    STORE 9
+    MOVE acc IN1
+    JUMP -345 
+
+###### STACK_DUMP ######
+    MOVE IN2 ACC
+    SUBI 1              # Because Stack points on next Free cell!
+    STORE 1
+    LOAD 1001
+    MOVE ACC IN1
+    LOADIN 1 7
+    STORE 2
+    LOAD 1
+    MOVE ACC IN1
+    MOVE IN1 ACC
+    SUB 2
+    JUMPC <= 8              
+    LOADIN 1 0
+    STORE 0
+    PRINT 0
+    MOVE IN1 ACC
+    SUBI 1
+    MOVE ACC IN1
+    JUMP -9             
+    JUMP 0
+###### MALLOC METHOD ######
+    LOADIN 1 0
+    STORE 1                 # Size of to alloc memory
+    SUBI 1073741824
+    JUMPC > 81                
+    LOADI 4096              # Points of first frame
+    MOVE acc IN1
+    MOVE IN1 acc
+    SUB 4095
+    JUMPC > 52             
+    LOADIN 1 1              # Frame used?
+    JUMPC > 5             
+    LOADIN 1 0
+    SUB 1
+    SUBI 3
+    JUMPC >= 7           
+    LOADIN 1 0              # Load Frame Size
+    STORE 2                 # Store Frame Size to M(2)
+    MOVE IN1 acc
+    ADD 2                   # Frame Pointer + Frame Size 
+    MOVE acc IN1            # Point to next Frame
+    JUMP -14               
+    # If found but not at heap end, check if not last block before end
+    # Check if block could be splitt in two, second block would need 4
+    # Right now Data_len_old - Data_len_needed of current block is in acc
+    SUBI 3                  # Overhead of split frame would need 3
+    JUMPC <= 51              # If no Jump then split block
+    LOADIN 1 0
+    STORE 3                 # Store original Frame Size in M(3)
+    LOAD 1
+    ADDI 3
+    STOREIN 1 0             # Change Frame Size to new Size
+    STORE 2                 # Save new Frame Size
+    LOAD    1000            # Load Current PID
+    STOREIN 1 1             # Mark Frame with PID 
+
+    # Now store new Frame size at end of Frame
+    MOVE IN1 acc
+    STORE 4                 # Store Pointer of this Frame
+    ADD 2                   # Points to next Frame
+    MOVE acc IN1
+    LOAD 2
+    STOREIN 1 -1            # Store new Frame size at end of Frame
+    LOAD 4
+    MOVE acc IN1            # Restore Pointer to Frame Start
+
+    # Before setting up splitt Block between this and next Block,
+    # Check if this Block is last Block before Top of Heap
+    MOVE IN1 acc
+    SUB 4095
+    JUMPC >= 37              # Zero if this is last block. If positive, smth went wrong
+
+    # Now create split Block after this one
+    LOADIN 1 0              # New Frame Size
+    STORE 2
+    MOVE IN1 acc
+    ADD 2
+    MOVE acc IN1            # Points to new split Frame
+    LOADI 0
+    STOREIN 1 1             # Mark as unused
+    # Calculate split Block size
+    LOAD 3                  # Original Block Size
+    SUBI 3
+    SUB 1                   
+    STOREIN 1 0             # Store split block size
+    STORE 3
+    
+    # Store split Block size at end of split Frame
+    MOVE IN1 acc
+    ADD 3                   # Points to next Frame
+    MOVE acc IN1
+    LOAD 3
+    STOREIN 1 -1            # Store new Frame size at end of Frame
+    JUMP 19           
+    # Done with this branch
+
+    LOAD 1                  # Args count
+    ADDI 3
+    STOREIN 1 0             # Store Frame Size on Heap
+    STORE 2
+
+    # Now store new Frame size at end of Frame
+    MOVE IN1 acc
+    STORE 4                 # Store Pointer of this Frame
+    STORE 4095              # Update Heap Top Pointer
+    ADD 2                   # Points to next Frame
+    MOVE acc IN1
+    LOAD 2
+    STOREIN 1 -1            # Store new Frame size at end of Frame
+    LOAD 4
+    MOVE acc IN1            # Restore Pointer to Frame Start
+
+# Alloc without splitting
+    LOAD    1000            # Load PID
+    STOREIN 1 1             # Mark Frame as used
+    MOVE IN1 acc
+    STORE 4
+    JUMP 1            
+
+    LOAD 0
+    MOVE acc IN1                # Load Pointer to return arg
+    LOAD 4                      # Pointer to Heap Frame
+    ADDI 2                      # Now point to first arg in heap Frame
+    STOREIN 1 0
+    JUMP -174  
+
+    LOAD 0
+    MOVE ACC IN1
+    LOADI 0
+    STOREIN 1 0
+    JUMP -179  
+
+###### FREE METHOD ######
+    LOADIN 1 0                  # Heap Pointer to data
+    SUBI 2                      # Change pointer to frame start
+    STORE 1
+    MOVE acc IN1                # Heap Frame Pointer in IN1
+    # Check if Heap Pointer is valid
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 294                
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -246
+
+    # Pointer seems to be valid, now check if Permission to free Frame exists:
+    LOAD 1000
+    SUBI 1
+    JUMPC = 4                   # Kernel has Permission for everything
+    LOADIN 1 1                  # LOAD PID
+    SUB 1000
+    JUMPC != 403                # If Current PID isn't the same with Frame-PID, no Permission!
+
+    LOADI 0
+    STOREIN 1 1                 # Mark Frame as unused
+
+    # Check if Frame is last Frame on heap
+    LOAD 1
+    SUB 4095
+    JUMPC >= 43             
+
+    # Now check if Frame behind is unused
+    LOADIN 1 0
+    STORE 2
+    MOVE IN1 acc
+    ADD 2
+    MOVE acc IN1
+    LOADIN 1 1                  # Is next Frame used?
+    JUMPC > 14                  # JUMP if used
+    # Fuse this and next Frame
+    LOADIN 1 0
+    STORE 3                     # Store size of next Block
+    LOAD 1
+    MOVE acc IN1                # Restore frame pointer to Block
+    LOAD 3                      # Load size of next Block
+    ADD 2                       # Add size of this Block
+    STOREIN 1 0                 # Update size of Block
+    STORE 2
+    MOVE IN1 acc
+    ADD 2
+    MOVE acc IN1                # Jump to end of fused Frame
+    LOAD 2
+    STOREIN 1 -1                # Update Frame Length at end of Frame
+
+    MOVE IN1 acc
+    SUB 2
+    MOVE acc IN1                # Restore Pointer to Frame
+    # Before checking Block before, ensure that this Block is not at M(4096)
+    SUBI 4096
+    JUMPC <= -227  
+
+    LOADIN 1 -1
+    STORE 3
+    MOVE IN1 acc
+    SUB 3
+    MOVE acc IN1
+    LOADIN 1 1
+    JUMPC > -234                # If Block before is used, Return
+    LOAD 3
+    ADD 2
+    STOREIN 1 0
+    STORE 2
+    MOVE IN1 acc
+    ADD 2
+    MOVE acc IN1                # Jump to end of fused Frame
+    LOAD 2
+    STOREIN 1 -1                # Update Frame Length at end of Frame
+    JUMP -244  
+
+
+    # Update Heap Top Pointer
+    LOAD 4095                   # Heap Top Pointer
+    SUBI 4096
+    JUMPC <= 20               
+
+    # Now check if Frame before is unused. Delete both if so
+    LOADIN 1 -1
+    STORE 3
+    MOVE IN1 acc
+    SUB 3
+    MOVE acc IN1
+    LOADIN 1 1
+    JUMPC = 4                  
+    MOVE IN1 acc
+    ADD 3
+    MOVE acc IN1
+
+    MOVE IN1 acc
+    SUBI 4096
+    JUMPC <= 7                
+    LOADIN 1 -1
+    STORE 3
+    MOVE IN1 acc
+    SUB 3
+    STORE 4095                  # Store updated Heap top Pointer
+    JUMP -266  
+
+    LOADI 4095
+    STORE 4095
+    JUMP -269  
+
+###### REALLOC METHOD ######
+    LOADI 0
+    STORE 4                     # Reset Flag in M(4)
+    LOADIN 1 1                  # Wanted Size
+    STORE 2                     
+    LOADIN 1 0                  # Heap Pointer to data
+    SUBI 2                      # Change pointer to frame start
+    STORE 1
+    MOVE acc IN1                # Heap Frame Pointer in IN1
+    # Check if Heap Pointer is valid
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 200                
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -340
+
+    # Pointer seems to be valid, now check if Permission to free Frame exists:
+    LOAD 1000
+    SUBI 1
+    JUMPC = 4                      # Kernel has Permission for everything
+    LOADIN 1 1                  # LOAD PID
+    SUB 1000
+    JUMPC != 309                # If Current PID isn't the same with Frame-PID, no Permission!
+
+    LOADIN 1 0
+    SUBI 3                      # 3 cells needed for Header/Footer
+    SUB 2                       # Space needed for new Size
+    JUMPC < 35                  # If old-space - new_space >= 0, reuse block. 0 = perfect fit
+    # Old Block Reusable. Check if Splitting makes sense and if frame is last on heap
+    STORE 3
+    MOVE IN1 acc
+    SUB 4095
+    JUMPC < 3                
+    LOADI 1
+    STORE 4                     # Store Flag to resize Block but not to create new Split Block
+
+    LOAD 3
+    SUBI 3                      # Check if Splitting Frame is possible
+    JUMPC <= -304               # If split useless, return. Pointer already on arg stack
+
+    # Split Frames. Use Code from Malloc
+    LOADIN 1 0
+    STORE 3                 # Store original Frame Size in M(3)
+    LOAD 2                  # Load wanted size
+    ADDI 3                  # Add overhead size
+    STOREIN 1 0             # Change Frame Size to new Size
+    STORE 2                 # Save new Frame Size
+
+    # Now store new Frame size at end of Frame
+    MOVE IN1 acc
+    ADD 2                   # Points to next Frame
+    MOVE acc IN1
+    LOAD 2
+    STOREIN 1 -1            # Store new Frame size at end of Frame
+
+    # Before setting up splitt Block between this and next Block,
+    # Check if Flag to skip creating split block is set (1=dont create split block)
+    LOAD 4
+    JUMPC > -317            # If no split block needed, done. Pointer already on arg stack
+
+    # Now create split Block after this one
+    LOADI 0
+    STOREIN 1 1             # Mark as unused
+    # Calculate split Block size
+    LOAD 3                  # Original Block Size
+    SUB 2                   # Sub Frame Size of new Frame
+    STOREIN 1 0             # Store split block size
+    STORE 2
+    
+    # Store split Block size at end of split Frame
+    MOVE IN1 acc
+    ADD 2                   # Points to next Frame
+    MOVE acc IN1
+    LOAD 2
+    STOREIN 1 -1            # Store new Frame size at end of Frame
+    JUMP -329  
+    # Done with this branch
+
+    # Check if Frame is last one
+    MOVE IN1 acc
+    SUB 4095
+    JUMPC < 11             
+    LOAD 2                  # Load wanted Size
+    ADDI 3                  # Add header size
+    STOREIN 1 0             # Store at Frame Start
+    STORE 3
+    MOVE IN1 acc
+    ADD 3
+    MOVE acc IN1            # Jump to end of frame
+    LOAD 3                  # Load Frame Size
+    STOREIN 1 -1          # Update end Frame size
+    JUMP -342               # Return
+
+    # Check if next Frame is Free and big enough and Split is usefull
+    LOADIN 1 0
+    STORE 3
+    MOVE IN1 acc
+    ADD 3
+    MOVE acc IN1
+    LOADIN 1 1              # Load flag if used
+    JUMPC > 51                  # Jumpes if next Frame is used
+    LOADIN 1 0
+    STORE 4                     # Store Size of next Frame
+    LOAD 2                  # Load wanted data size
+    ADDI 3                  # Add header
+    SUB 3                   # Minus (header+old data size) = minimum size of next Block
+    SUB 4                   # Subtract actual size of next Block
+    JUMPC > 44                  # Zero or negativ if Space is enough
+    # Check if Split of next Frame is usefull
+    ADDI 4                  # Leftover Space is NEGATIVE, so if <= 0, split
+    JUMPC <= 14           
+    # Just put two Frames together. No split of next Frame.
+    MOVE IN1 acc
+    SUB 3
+    MOVE acc IN1
+    LOADIN 1 0
+    ADD 4
+    STOREIN 1 0
+    STORE 3                 # Store new size of Frame. Old Size not longer needed 
+    MOVE IN1 acc
+    ADD 3
+    MOVE acc IN1            # Point to next Frame
+    LOAD 3
+    STOREIN 1 -1            # Store Frame size at Frame end
+    JUMP -371  
+
+    # Next block can be reused and split. Resize old Block, then do rest
+    MOVE IN1 acc
+    SUB 3
+    MOVE acc IN1
+    LOAD 2                  # Wanted size
+    ADDI 3
+    STOREIN 1 0
+    LOAD 3                  # Size of old Block
+    ADD 4                   # Size of next Block (befor split)
+    SUB 2
+    SUBI 3                  # Overall size - Size of new Block = size of split Block
+    STORE 4                 # Store new size of split Block at M(4)
+    LOADIN 1 0
+    STORE 3                 # Store new size of old Block in 3
+    MOVE IN1 acc
+    ADD 3
+    MOVE acc IN1            # Point to end of old Block
+    LOAD 3
+    STOREIN 1 -1            # Set size at end of old Frame
+    LOAD 4
+    STOREIN 1 0             # Set size of new split Frame
+    LOADI 0
+    STOREIN 1 1             # Mark split Frame as unused
+    MOVE IN1 acc
+    ADD 4
+    MOVE acc IN1            # Point to end of Split Frame
+    LOAD 4
+    STOREIN 1 -1            # Update size pointer at end of Split Frame
+    JUMP -399               # Adress of Heap didnt change, so old pointer in arg is correct
+
+    # Old Block couldnt be reused in any way. alloc new space, then copy.
+    # Call Malloc
+    LOADI 1
+    STORE 1026
+    LOAD 2                  # Size of new Data is at M(2)
+    STORE 1030
+    LOADI -313   
+    STORE 1024
+    MOVE pc acc
+    STORE 1025
+    JUMP -463
+
+    LOAD 0                  # Load Pointer to return cell
+    MOVE acc IN1
+    LOAD 1030               # Points at data-cells of new frame, not frame start
+    STOREIN 1 0             # Store new Pointer at return cell
+    STORE 4
+
+    # Now copy Data from old frame to new Frame. New Frame > Old Frame!
+    LOAD 1                  # Pointer to old Frame start
+    ADDI 2                  # Point to old data start
+    STORE 3                 
+    MOVE acc IN1
+    LOADIN 1 -2             # Load size of old Frame
+    SUBI 3
+    STORE 2                 # Amount of cells to copy
+    LOAD 2
+    JUMPC <= 18               
+    SUBI 1
+    STORE 2                 # Decrease Loop Counter
+    LOAD 3
+    MOVE acc IN1
+    LOADIN 1 0
+    STORE 5                 # Store Data in M(5)
+    MOVE IN1 acc
+    ADDI 1                  # Increase Old data pointer by one
+    STORE 3
+    LOAD 4
+    MOVE acc IN1
+    LOAD 5
+    STOREIN 1 0             # Copy Data to new Frame
+    MOVE IN1 acc
+    ADDI 1                  # Increase new data pointer by one
+    STORE 4
+    JUMP -18                
+
+    # Free old Block, then return. Return val is already stored
+    LOADI 1
+    STORE 1026
+    LOAD 1                  # Points to beginn of Frame
+    ADDI 2                  # Points to beginn of data as Free(n) expects
+    STORE 1030
+    LOADI -265 
+    STORE 1024
+    MOVE pc acc
+    STORE 1025
+    JUMP -504
+    JUMP -450  
+
+###### CALLOC ######
+    # Call Malloc
+    LOADIN 1 0          # load n
+    STORE 1030          # store as argument
+    LOADI 1
+    STORE 1026          # set arg count to 1
+    LOADI -364          # Offset to MALLOC
+    STORE 1024
+    MOVE pc acc
+    STORE 1025
+    JUMP -514           # CALL
+
+    LOAD 1030           # Pointer to data-start
+    STOREIN 1 0
+    STORE 2
+    MOVE acc IN1
+    LOADIN 1 -2         # Load frame size
+    SUBI 3              # subtract header size
+    STORE 3             # M(3) = Loop Counter
+    LOADI 0
+    STORE 4
+
+    LOAD 3
+    JUMPC <= 10             # if <= done with filling zero
+    SUBI 1
+    STORE 3             # decrease counter
+
+    LOAD 4              # Load 0
+    STOREIN 1 0         # Copy 0 to data-cell
+
+    LOAD 2              # Load pointer
+    ADDI 1              # increase pointer
+    STORE 2             # store new pointer
+    MOVE acc IN1        # put pointer into IN1
+    JUMP -10        
+
+    # Der Daten-Pointer steht noch in M(1030) (von MALLOC geschrieben).
+    # Damit ist der Rückgabewert bereits an der richtigen Stelle.
+    JUMP -480  
+
+##### CHECK_HEAP_POINTER #####
+    LOADIN 1 0
+    STORE 1             # Pointer to Heap Block Start
+    MOVE ACC IN1
+    SUBI 4096
+    JUMPC < 61                
+    LOAD 4095
+    SUB 1
+    JUMPC < 58                
+    LOADIN 1 1
+    JUMPC = 56                
+    LOADIN 1 0
+    STORE 2             # Size of Block
+    LOAD 1
+    SUBI 1
+    ADD 2
+    MOVE ACC IN1
+    LOADIN 1 0
+    SUB 2
+    JUMPC != 47                
+    JUMP -500  
+
+##### MEMSET #####
+    LOADIN 1 0
+    STORE 1             # Base Pointer
+    LOADIN 1 1          # Amount of Cells
+    ADD 1
+    SUBI 1
+    STORE 2             # Last Cell to write to
+    LOADIN 1 2
+    STORE 3             # Value
+    LOAD 1
+    MOVE ACC IN1
+
+    # Write Value to every Cell. No Acces check because Base Pointer maybe isnt Heap Pointer
+    LOAD 2
+    SUB 1
+    JUMPC < -513  
+    LOAD 3
+    STOREIN 1 0
+    MOVE IN1 ACC
+    ADDI 1
+    STORE 1
+    MOVE ACC IN1
+    JUMP -9       
+
+
+
+##### SIZEOF #####
+    LOADIN 1 0
+    MOVE ACC IN1
+    SUBI 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -46                
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -586
+
+    # Pointer seems to be valid, now check if Permission to acces Frame exists:
+    LOAD 1000
+    SUBI 1
+    JUMPC = 4                     # Kernel has Permission for everything
+    LOADIN 1 1                  # LOAD PID
+    SUB 1000
+    JUMPC != 63                 # If Current PID isn't the same with Frame-PID, no Permission!
+
+    LOADIN 1 -2
+    SUBI 3
+    STORE 1
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 0
+    JUMP -545  
+
+##### SEGMENTATION_FAULT #####
+    LOADIN 1 0
+    STORE 1
+    PRINTC 110
+    PRINTC 183
+    PRINTC 169
+    PRINTC 171
+    PRINTC 177
+    PRINTC 169
+    PRINTC 178
+    PRINTC 184
+    PRINTC 165
+    PRINTC 184
+    PRINTC 173
+    PRINTC 179
+    PRINTC 178
+    PRINTC 132
+    PRINTC 170
+    PRINTC 165
+    PRINTC 185
+    PRINTC 176
+    PRINTC 184
+    PRINTC 158
+    PRINTC 132
+    PRINT 1
+    PRINTC 110
+    JUMP -500      
+
+##### EXCEPTION #####
+    PRINTC 110
+    PRINTC 169
+    PRINTC 188
+    PRINTC 167
+    PRINTC 169
+    PRINTC 180
+    PRINTC 184
+    PRINTC 173
+    PRINTC 179
+    PRINTC 178
+    PRINTC 132
+    PRINTC 167
+    PRINTC 165
+    PRINTC 185
+    PRINTC 183
+    PRINTC 169
+    PRINTC 168
+    PRINTC 132
+    PRINTC 166
+    PRINTC 189
+    PRINTC 132
+    PRINTC 185
+    PRINTC 183
+    PRINTC 169
+    PRINTC 182
+    PRINTC 133
+    PRINTC 110
+    JUMP -528      
+
+##### PERMISSION_DENIED #####
+    PRINTC 110
+    PRINTC 180
+    PRINTC 201
+    PRINTC 214
+    PRINTC 209
+    PRINTC 205
+    PRINTC 215
+    PRINTC 215
+    PRINTC 205
+    PRINTC 211
+    PRINTC 210
+    PRINTC 132
+    PRINTC 216
+    PRINTC 211
+    PRINTC 132
+    PRINTC 172
+    PRINTC 201
+    PRINTC 197
+    PRINTC 212
+    PRINTC 132
+    PRINTC 168
+    PRINTC 201
+    PRINTC 210
+    PRINTC 205
+    PRINTC 201
+    PRINTC 200
+    PRINTC 133
+    PRINTC 110
+    JUMP -557      
+LOADI 99
+STORE 0
+
+LOAD 0
+ADDI 1
+MOVE ACC IN1
+STORE 0
+SUBI 100
+STOREIN 1 0
+SUBI 127
+JUMPC < -7              
+JUMP -913              
+
+###### MIN METHOD ######
+    LOADIN 1 0              # IN1 is Frame-Pointer because Call Method puts it there
+    STORE 1                 # x is now at M(1)
+    LOADIN 1 1
+    SUB 1                   # y - x
+    JUMPC >= -644      # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
+    LOADIN 1 1
+    STOREIN 1 0             # Store y in ReturnValue Adress
+    JUMP -647  
+
+###### MAX METHOD ######
+    LOADIN 1 0
+    STORE 1                 # x is now at M(1)
+    LOADIN 1 1
+    SUB 1                   # y - x
+    JUMPC <= -652      # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
+    LOADIN 1 1
+    STOREIN 1 0             # Store y in ReturnValue Adress
+    JUMP -655  
+
+###### MUL METHOD ######
+    LOADIN 1 1
+    STORE 5              # original y (for sign)
+    STORE 2              # |y|
+    JUMPC >= 4        
+    LOADI 0
+    SUB 5
+    STORE 2
+    LOADIN 1 0
+    STORE 4              # original x (for sign)
+    STORE 1              # |x|
+    JUMPC = -666         # x == 0: result slot already holds 0
+    JUMPC > 4       
+    LOADI 0
+    SUB 4
+    STORE 1
+    LOADI 0
+    STORE 3
+    LOAD 2
+    JUMPC <= 7       
+    SUBI 1
+    STORE 2
+    LOAD 3
+    ADD 1
+    STORE 3
+    JUMP -7      
+    LOAD 4
+    JUMPC > 4         
+    LOADI 0
+    SUB 3
+    STORE 3              # x < 0: negate result
+    LOAD 5
+    JUMPC >= 4       
+    LOADI 0
+    SUB 3
+    STORE 3              # y < 0: negate result
+    LOAD 0
+    MOVE acc IN1
+    LOAD 3
+    STOREIN 1 0
+    JUMP -695  
+
+##### DIVMOD #####
+    LOADIN 1 1
+    JUMPC = 44                     # b == 0: abort
+    STORE 5              # keep original b for sign
+    STORE 2              # |b|
+    JUMPC > 4        
+    LOADI 0
+    SUB 5
+    STORE 2              # b < 0: negate
+    LOADIN 1 0
+    STORE 4              # keep original a for sign
+    STORE 1              # |a|, becomes the remainder
+    JUMPC >= 4       
+    LOADI 0
+    SUB 4
+    STORE 1              # a < 0: negate
+    LOADI 0
+    STORE 3              # quotient = 0
+    LOAD 1
+    SUB 2                # acc = rem - |b|
+    JUMPC < 6            # rem < |b|: done
+    STORE 1              # rem = rem - |b|
+    LOAD 3
+    ADDI 1
+    STORE 3              # quotient++
+    JUMP -7      
+    LOAD 4
+    JUMPC >= 7           # a >= 0: nothing to fix
+    LOADI 0
+    SUB 3
+    STORE 3              # a < 0: negate quotient
+    LOADI 0
+    SUB 1
+    STORE 1              # remainder gets sign of a
+    LOAD 5
+    JUMPC > 4       
+    LOADI 0
+    SUB 3
+    STORE 3              # b < 0: negate quotient
+    LOAD 0
+    MOVE acc IN1
+    LOAD 3
+    STOREIN 1 0          # quotient
+    LOAD 1
+    STOREIN 1 1          # remainder
+    JUMP -740  
+
+    PRINTC 110
+    PRINTC 168
+    PRINTC 205
+    PRINTC 218
+    PRINTC 205
+    PRINTC 215
+    PRINTC 205
+    PRINTC 211
+    PRINTC 210
+    PRINTC 132
+    PRINTC 198
+    PRINTC 221
+    PRINTC 132
+    PRINTC 190
+    PRINTC 201
+    PRINTC 214
+    PRINTC 211
+    PRINTC 133
+    PRINTC 110
+    JUMP -689      
+
+    MOVE IN2 ACC
+    STORE 1030                  # Start of the global cells
+    ADDI 20
+    MOVE ACC IN2                # Allocate first KERNEL_STACKSPACE Cells of Stack for process-global values
+                                # (before MEMSET, otherwise its Call-Frame lies inside the cleared area)
+    LOADI 20
+    STORE 1031
+    LOADI 0
+    STORE 1032
+    LOADI 3
+    STORE 1026
+    LOADI -270   
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -830
+    
+
+    # get Input Buffer
+    LOADI 128
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -329   
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -839
+    LOAD 1001
+    MOVE ACC IN1
+    LOADIN 1 7
+    MOVE ACC IN1
+    LOAD 1030
+    STOREIN 1 0
+    STOREIN 1 2
+    STOREIN 1 1
+    LOADI 0
+    STOREIN 1 3
+
+    # Now create ECHO Process for Testing
+    LOADI 2
+    STORE 1030
+
+    LOADI 586                # Relative Offset to Kernel-Entry
+    STORE 1
+    MOVE PC ACC                 # Current Adress
+    ADD 1
+    SUBI 2
+    STORE 1031              # Entry Point adress
+
+    LOADI 0
+    STORE 1032              # Amount of Process Args
+    LOADI 3
+    STORE 1026
+    LOADI 153         
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -866
+
+
+    #LOAD 1003
+    #MOVE ACC IN1
+    #LOADIN 1 PCB_STACK_BASE
+    #MOVE ACC IN1
+    #LOADIN 1 KERNEL_INBUF_COUNT
+
+    #STORE 0
+    #PRINT 0
+    LOADI 11                
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -871
+    LOADI -946  
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -876
+    JUMP -10        
+
+##### KERNEL_READ_INPUT #####
+    # Check if Input Buffer is already full
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 7
+    MOVE ACC IN1
+    LOADIN 1 3
+    SUBI 128
+    JUMPC >= 28                    
+    
+    # Buffer isn't full. Try to read next input
+    READ 26                              # Jumps to Flag if there is no Input, otherwise contiues
+    STORE 0                              # Key (ACC) would be lost by the LOADINs below
+    LOADIN 1 0
+    STORE 1
+    LOADIN 1 2
+    STORE 2
+    MOVE ACC IN1
+    LOAD 0
+    STOREIN 1 0
+
+    # Update Ringbuffer-Pointer
+    LOAD 2                                  
+    ADDI 1
+    STORE 2                                 # Absolute Adresse
+    SUB 1                                   # Now is relative Index
+    SUBI 128
+    JUMPC < 3                       
+    LOAD 1
+    STORE 2
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 7
+    MOVE ACC IN1
+    LOAD 2
+    STOREIN 1 2
+    LOADIN 1 3
+    ADDI 1
+    STOREIN 1 3
+    JUMP -856  
+
+    # Design choice to make. Until now, dont read input buffer
+    JUMP -857  
+
+##### READ_KEY #####
+    # This Function can be called by any Process, so Kernel-Context is not automatically provided!
+    # Check if there is any Key in the buffer. Otherwise, do a YIELD
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 7
+    MOVE ACC IN1
+    LOADIN 1 3
+    STORE 3
+    JUMPC <= 30            
+
+    LOADIN 1 0
+    STORE 1
+    LOADIN 1 1
+    STORE 2
+    MOVE ACC IN1
+    LOADIN 1 0
+    STORE 5                         # Key Value is on M(5) now!
+
+    LOAD 2
+    ADDI 1
+    STORE 2
+    SUB 1
+    SUBI 128
+    JUMPC < 3              
+    LOAD 1
+    STORE 2
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 7
+    MOVE ACC IN1
+    LOAD 2
+    STOREIN 1 1
+    LOADIN 1 3
+    SUBI 1
+    STOREIN 1 3
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 5
+    STOREIN 1 0
+    JUMP -893  
+
+    # If empty, do a Yield. Rn State Waiting is not supported, so gotta do a check every time
+    LOADI 0
+    STORE 1026 
+    LOADI -1025 
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -955
+    JUMP -43     
+
+##### KERNEL_INSERT_PCB #####
+    LOADIN 1 0
+    STORE 1             # Pointer to new PCB
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 1
+    STORE 2
+    LOAD 1
+    STOREIN 1 1
+    LOAD 2
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 0
+    MOVE ACC IN1
+    LOAD 1003
+    STOREIN 1 0
+    LOAD 2
+    STOREIN 1 1
+    LOAD 1002
+    ADDI 1
+    STORE 1002
+    JUMP -922  
+
+    LOADIN 1 0
+    STORE 1             # PID
+
+    # Allocate Heap for PCB
+    LOADI 8
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -838   
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -988
+    LOAD 1030
+    STORE 2
+    MOVE ACC IN1
+    
+    # Prepare PCB
+    LOAD 1
+    STOREIN 1 2
+    LOADI 0
+    STOREIN 1 3
+    STOREIN 1 4
+    STOREIN 1 5
+
+    # Allocate Heap for Stack
+    LOADI 256
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -496   
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1006
+    LOAD 1030
+    STOREIN 1 7
+    STOREIN 1 6
+
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 2
+    STOREIN 1 0
+    JUMP -959  
+
+##### CREATE_TASK #####
+    # Can be called out of any Context!
+    LOAD 1000
+    STORE 1             # Save current PID
+    LOADI 1
+    STORE 1000          # Switch to Kernel Mode
+
+    LOADIN 1 0
+    STORE 2             # New PID
+    LOADIN 1 1
+    STORE 3             # Absolute Adress of Entry Point
+    LOADIN 1 2
+    STORE 4             # Amount of Process Arguments
+
+    # Create & Prepare PCB
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -51               
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1033
+
+    LOAD 1030       
+    STORE 5                 
+
+    # Now prepare new Stack.
+    LOAD 5
+    STORE 1030              # PCB
+    LOAD 3
+    STORE 1031              # Absolute adress of entry Point
+    LOAD 4
+    STORE 1032              # Amount of Process-Arguments
+    STORE 6                 # Working Copy
+
+    LOAD 0
+    ADDI 3
+    STORE 7                 # Pointer to first Argument source
+    LOADI 1033
+    STORE 8                 # Pointer to first Argument 
+    
+    LOAD 6
+    JUMPC <= 16             
+    SUBI 1
+    STORE 6
+    LOAD 7
+    MOVE ACC IN1
+    ADDI 1
+    STORE 7
+    LOADIN 1 0
+    STORE 9
+    LOAD 8
+    MOVE ACC IN1
+    ADDI 1
+    STORE 8
+    LOAD 9
+    STOREIN 1 0
+    JUMP -16            
+
+    LOADI 3
+    ADD 4
+    STORE 1026
+    LOADI -1205                           
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1072
+
+    LOAD 5
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -120              
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1081
+    LOAD 1
+    STORE 1000
+    JUMP -1029 
+##### MERGE_HEAP_STRINGS #####
+    LOADIN 1 0
+    STORE 1
+    LOADIN 1 1
+    STORE 2
+    SUB 1
+    JUMPC = -463            # In Case both Strings are the same
+    LOAD 1
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 107             
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1099
+    LOAD 1030
+    STORE 3
+
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 96              
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1110
+    LOAD 1030
+    ADD 3
+    ADDI 1              # For Zero Terminator
+    STORE 3             # M(3) holds needed size
+
+    LOAD 1
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -543   
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1123
+    LOAD 1030
+    SUB 3
+    JUMPC >= 14                      
+    # Need to realloc Main Buffer
+    LOAD 1
+    STORE 1030
+    LOAD 3
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI -808    
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1137
+    LOAD 1030
+    STORE 1
+    LOAD 1
+    STORE 1030
+    LOAD 2
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI 29     
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1150
+    # Now Free secondary Buffer
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -920 
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1159
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 0
+    JUMP -1109 
+
+##### PRINT #####
+    LOADIN 1 0
+    MOVE ACC IN1
+    LOADIN 1 0
+    JUMPC <= -1113 
+    STORE 1
+    PRINTC 1
+    MOVE IN1 ACC
+    ADDI 1
+    MOVE ACC IN1
+    JUMP -7        
+
+###### STRCAT ######
+    LOADIN 1 0
+    STORE 1             # Pointer to Main String
+    LOADIN 1 1
+    STORE 2             # Pointer to Secondary String
+    LOAD 1
+    MOVE ACC IN1
+    LOADIN 1 0
+    JUMPC = 5                
+    MOVE IN1 ACC
+    ADDI 1
+    MOVE ACC IN1
+    JUMP -5          
+    MOVE IN1 ACC
+    STORE 1
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 0
+    JUMPC = -1137 
+    STORE 3
+    LOAD 1
+    MOVE ACC IN1
+    LOAD 3
+    STOREIN 1 0
+    MOVE IN1 ACC
+    ADDI 1
+    STORE 1
+    JUMP -12         
+
+###### GET_STRING_SIZE ######
+    LOADI 0
+    STORE 3                 # Counter for Size
+    STORE 4                 # Flag if Max-size if given
+    LOADIN 1 0
+    STORE 1
+    LOADIN 2 -2             # Load Arg Count
+    SUBI 1
+    JUMPC = 24                      
+    LOADI 1
+    STORE 4                 # Set Flag
+    LOADIN 1 1
+    ADD 1
+    SUBI 1
+    STORE 2                 # Last Cell within String
+    LOAD 1
+    MOVE ACC IN1
+
+    LOADIN 1 0
+    JUMPC = 25                  
+    MOVE IN1 ACC
+    ADDI 1
+    MOVE ACC IN1
+    STORE 5
+    LOAD 4
+    JUMPC = 4                               
+    LOAD 5
+    SUB 2
+    JUMPC > 25                 
+    LOAD 3
+    ADDI 1
+    STORE 3
+    JUMP -14                  
+
+    LOAD 1
+    MOVE ACC IN1
+    LOADIN 1 0
+    JUMPC = 8                   
+    MOVE IN1 ACC
+    ADDI 1
+    MOVE ACC IN1
+    LOAD 3
+    ADDI 1
+    STORE 3
+    JUMP -8                   
+
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 3
+    STOREIN 1 0
+    LOAD 4
+    JUMPC = -1194 
+    LOADI 1
+    STOREIN 1 1
+    JUMP -1197 
+
+    LOAD 0
+    MOVE ACC IN1
+    LOADIN 1 1
+    STOREIN 1 0         # Copy Max Size as return arg
+    LOADI 0
+    STOREIN 1 1
+    JUMP -1204 
+
+###### ATOI METHOD ######
+    LOADI 0
+    STORE 4
+    STORE 5
+    LOADIN 1 0              # Pointer to String
+    STORE 1
+    LOADIN 2 -2
+    STORE 2
+    SUBI 1                  # If only one argument, then skip following
+    JUMPC = 6             
+    LOADIN 1 1              # Load offset
+    STORE 3
+    LOAD 1
+    ADD 3
+    STORE 1
+
+    LOAD 1
+    MOVE ACC IN1
+    LOADIN 1 0
+    SUB 145                 # Ascii 145 (negative Value)
+    STORE 3                 # M(3) is zero if first char is negative, != 0 if not
+    JUMPC != 4              
+    LOAD 1
+    ADDI 1
+    STORE 1
+
+    LOAD 1
+    MOVE ACC IN1
+    LOADIN 1 0
+    SUBI 48
+    STORE 2
+    JUMPC < 21            
+    SUBI 9
+    JUMPC > 19            
+    # Call multiply method and multiply old buffer by ten, then add number to buffer
+    LOADI 2                 # 2 Arguments
+    STORE 1026
+    LOAD 4                  # Load Result of parser
+    STORE 1030              # Parse result to args
+    LOADI 10                # -1 to negate
+    STORE 1031              # store -1 to args
+    LOADI -586
+    STORE 1024
+    MOVE pc acc
+    STORE 1025
+    JUMP -1301
+    LOAD 1030
+    ADD 2
+    STORE 4
+    LOAD 1
+    ADDI 1
+    STORE 1
+    JUMP -25            
+
+
+    LOAD 3
+    JUMPC != 14             # Jump if no - found before number
+    LOADI 2                 # 2 Arguments
+    STORE 1026
+    LOAD 4                  # Load Result of parser
+    STORE 1030              # Parse result to args
+    LOADI -1                # -1 to negate
+    STORE 1031              # store -1 to args
+    LOADI -606
+    STORE 1024
+    MOVE pc acc
+    STORE 1025
+    JUMP -1321
+    LOAD 1030
+    STORE 4
+
+    LOAD 0
+    MOVE ACC IN1
+    LOADIN 2 -2
+    SUBI 1
+    JUMPC = 6                 
+    LOADIN 1 0
+    STORE 2
+    LOAD 1
+    SUB 2
+    STOREIN 1 1
+    LOAD 4
+    STOREIN 1 0
+    JUMP -1281 
+
+###### ITOA METHOD ######
+    LOADIN 1 0              # Integer to Convert
+    STORE 1
+    LOADIN 1 1              # String Buffer (expected to be big enough)
+    STORE 2
+    MOVE IN2 ACC
+    ADDI 11
+    MOVE ACC IN2            # Update Stack Pointer 
+
+    LOADI 1000000000
+    STOREIN 2 -11
+    LOADI 100000000
+    STOREIN 2 -10
+    LOADI 10000000
+    STOREIN 2 -9
+    LOADI 1000000
+    STOREIN 2 -8
+    LOADI 100000
+    STOREIN 2 -7
+    LOADI 10000
+    STOREIN 2 -6
+    LOADI 1000
+    STOREIN 2 -5
+    LOADI 100
+    STOREIN 2 -4
+    LOADI 10
+    STOREIN 2 -3
+    LOADI 1
+    STOREIN 2 -2
+    LOADI 0
+    STOREIN 2 -1
+
+    LOADI 0
+    STORE 3                 # Flag if Zeros have to be printed
+    LOAD 2
+    MOVE ACC IN1
+    LOAD 1
+    JUMPC >= 9       
+    LOAD 145
+    STOREIN 1 0
+    MOVE IN1 ACC
+    ADDI 1
+    MOVE ACC IN1
+    LOADI 0
+    SUB 1
+    STORE 1                 # Store Value of negative Number in 1
+
+    MOVE IN2 ACC
+    SUBI 11                 # Points to 1.000.000.000
+    STORE 6                 # Holds Pointer
+    LOADIN 2 -11
+    STORE 4
+    LOAD 1
+    STORE 1030
+    LOAD 4
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI -640   
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1395
+    LOAD 1030               # quotient
+    STORE 5
+    JUMPC != 3              
+    LOAD 3
+    JUMPC = 9             
+    LOAD 148
+    ADD 5
+    STOREIN 1 0
+    MOVE IN1 ACC
+    ADDI 1
+    MOVE ACC IN1
+    LOADI 1
+    STORE 3
+    LOAD 1031               # remainder
+    STORE 1                 # update remainder
+    MOVE IN1 ACC
+    STORE 7
+    LOAD 6
+    ADDI 1
+    STORE 6
+    MOVE ACC IN1
+    LOADIN 1 0
+    STORE 4
+    JUMPC = 4        
+    LOAD 7
+    MOVE ACC IN1
+    JUMP -37      
+
+    LOAD 7
+    MOVE ACC IN1
+    LOAD 3
+    JUMPC != 6            
+    LOADI 148
+    STOREIN 1 0
+    MOVE IN1 ACC
+    ADDI 1
+    MOVE ACC IN1
+
+    LOADI 0
+    STOREIN 1 0             # Zero Terminator
+    MOVE IN2 ACC
+    SUBI 11
+    MOVE ACC IN2            # Update Stack Pointer 
+    JUMP -1382 
+    LOADI 32
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -1296  
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1446
+    LOAD 1030
+    STORE 0
+
+    LOADI 0
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -540     
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1457
+
+
+    LOAD 1030
+    STORE 1030
+    LOAD 0
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI -127 
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1468
+
+    LOAD 0
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -308  
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1477
+    PRINTC 110
+    JUMP -30      

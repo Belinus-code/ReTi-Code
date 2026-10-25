@@ -1,0 +1,348 @@
+#define KERNEL_STACKSPACE 20
+#define KERNEL_INBUF_BASE 0
+#define KERNEL_INBUF_OUTCELL 1
+#define KERNEL_INBUF_INCELL 2
+#define KERNEL_INBUF_COUNT 3
+#define KERNEL_INBUF_CONSTSIZE 128
+
+KERNEL_ENTRY:
+    MOVE IN2 ACC
+    STORE 1030                  # Start of the global cells
+    ADDI KERNEL_STACKSPACE
+    MOVE ACC IN2                # Allocate first KERNEL_STACKSPACE Cells of Stack for process-global values
+                                # (before MEMSET, otherwise its Call-Frame lies inside the cleared area)
+    LOADI KERNEL_STACKSPACE
+    STORE 1031
+    LOADI 0
+    STORE 1032
+    LOADI 3
+    STORE 1026
+    LOADI *MEMSET
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    
+
+    # get Input Buffer
+    LOADI KERNEL_INBUF_CONSTSIZE
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *CALLOC
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1001
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    MOVE ACC IN1
+    LOAD 1030
+    STOREIN 1 KERNEL_INBUF_BASE
+    STOREIN 1 KERNEL_INBUF_INCELL
+    STOREIN 1 KERNEL_INBUF_OUTCELL
+    LOADI 0
+    STOREIN 1 KERNEL_INBUF_COUNT
+
+    # Now create ECHO Process for Testing
+    LOADI 2
+    STORE 1030
+
+    LOADI *ECHO_ENTRY        # Relative Offset to Kernel-Entry
+    STORE 1
+    MOVE PC ACC                 # Current Adress
+    ADD 1
+    SUBI 2
+    STORE 1031              # Entry Point adress
+
+    LOADI 0
+    STORE 1032              # Amount of Process Args
+    LOADI 3
+    STORE 1026
+    LOADI *CREATE_TASK
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+
+KERNEL_LOOP:
+    #LOAD 1003
+    #MOVE ACC IN1
+    #LOADIN 1 PCB_STACK_BASE
+    #MOVE ACC IN1
+    #LOADIN 1 KERNEL_INBUF_COUNT
+
+    #STORE 0
+    #PRINT 0
+    LOADI *KERNEL_READ_INPUT
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOADI *YIELD
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    JUMP KERNEL_LOOP
+
+##### KERNEL_READ_INPUT #####
+KERNEL_READ_INPUT:
+    # Check if Input Buffer is already full
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    MOVE ACC IN1
+    LOADIN 1 KERNEL_INBUF_COUNT
+    SUBI KERNEL_INBUF_CONSTSIZE
+    JUMPC >= KERNEL_READ_INPUT_FULL
+    
+    # Buffer isn't full. Try to read next input
+    READ KERNEL_READ_INPUT_DONE          # Jumps to Flag if there is no Input, otherwise contiues
+    STORE 0                              # Key (ACC) would be lost by the LOADINs below
+    LOADIN 1 KERNEL_INBUF_BASE
+    STORE 1
+    LOADIN 1 KERNEL_INBUF_INCELL
+    STORE 2
+    MOVE ACC IN1
+    LOAD 0
+    STOREIN 1 0
+
+    # Update Ringbuffer-Pointer
+    LOAD 2                                  
+    ADDI 1
+    STORE 2                                 # Absolute Adresse
+    SUB 1                                   # Now is relative Index
+    SUBI KERNEL_INBUF_CONSTSIZE
+    JUMPC < KERNEL_READ_INPUT_NOWRAP
+    LOAD 1
+    STORE 2
+KERNEL_READ_INPUT_NOWRAP:
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    MOVE ACC IN1
+    LOAD 2
+    STOREIN 1 KERNEL_INBUF_INCELL
+    LOADIN 1 KERNEL_INBUF_COUNT
+    ADDI 1
+    STOREIN 1 KERNEL_INBUF_COUNT
+KERNEL_READ_INPUT_DONE:
+    JUMP RETURN
+
+KERNEL_READ_INPUT_FULL:
+    # Design choice to make. Until now, dont read input buffer
+    JUMP RETURN
+
+##### READ_KEY #####
+READ_KEY:
+    # This Function can be called by any Process, so Kernel-Context is not automatically provided!
+    # Check if there is any Key in the buffer. Otherwise, do a YIELD
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    MOVE ACC IN1
+    LOADIN 1 KERNEL_INBUF_COUNT
+    STORE 3
+    JUMPC <= READ_KEY_EMPTY
+
+    LOADIN 1 KERNEL_INBUF_BASE
+    STORE 1
+    LOADIN 1 KERNEL_INBUF_OUTCELL
+    STORE 2
+    MOVE ACC IN1
+    LOADIN 1 0
+    STORE 5                         # Key Value is on M(5) now!
+
+    LOAD 2
+    ADDI 1
+    STORE 2
+    SUB 1
+    SUBI KERNEL_INBUF_CONSTSIZE
+    JUMPC < READ_KEY_NOWRAP
+    LOAD 1
+    STORE 2
+READ_KEY_NOWRAP:
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    MOVE ACC IN1
+    LOAD 2
+    STOREIN 1 KERNEL_INBUF_OUTCELL
+    LOADIN 1 KERNEL_INBUF_COUNT
+    SUBI 1
+    STOREIN 1 KERNEL_INBUF_COUNT
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 5
+    STOREIN 1 0
+    JUMP RETURN
+
+READ_KEY_EMPTY:
+    # If empty, do a Yield. Rn State Waiting is not supported, so gotta do a check every time
+    LOADI 0
+    STORE 1026 
+    LOADI *YIELD
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    JUMP READ_KEY
+
+##### KERNEL_INSERT_PCB #####
+KERNEL_INSERT_PCB:
+    LOADIN 1 0
+    STORE 1             # Pointer to new PCB
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 PCB_PREV
+    STORE 2
+    LOAD 1
+    STOREIN 1 PCB_PREV
+    LOAD 2
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 PCB_NEXT
+    MOVE ACC IN1
+    LOAD 1003
+    STOREIN 1 PCB_NEXT
+    LOAD 2
+    STOREIN 1 PCB_PREV
+    LOAD 1002
+    ADDI 1
+    STORE 1002
+    JUMP RETURN
+
+KERNEL_CREATE_PCB:
+    LOADIN 1 0
+    STORE 1             # PID
+
+    # Allocate Heap for PCB
+    LOADI PCB_FRAME_SIZE
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *MALLOC
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    STORE 2
+    MOVE ACC IN1
+    
+    # Prepare PCB
+    LOAD 1
+    STOREIN 1 PCB_PID
+    LOADI 0
+    STOREIN 1 PCB_STATE
+    STOREIN 1 PCB_WAIT_REASON
+    STOREIN 1 PCB_WAIT_DATA
+
+    # Allocate Heap for Stack
+    LOADI 256
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *CALLOC
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    STOREIN 1 PCB_STACK_BASE
+    STOREIN 1 PCB_STACK_POINTER
+
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 2
+    STOREIN 1 0
+    JUMP RETURN
+
+##### CREATE_TASK #####
+CREATE_TASK:
+    # Can be called out of any Context!
+    LOAD 1000
+    STORE 1             # Save current PID
+    LOADI 1
+    STORE 1000          # Switch to Kernel Mode
+
+    LOADIN 1 0
+    STORE 2             # New PID
+    LOADIN 1 1
+    STORE 3             # Absolute Adress of Entry Point
+    LOADIN 1 2
+    STORE 4             # Amount of Process Arguments
+
+    # Create & Prepare PCB
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *KERNEL_CREATE_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOAD 1030       
+    STORE 5                 
+
+    # Now prepare new Stack.
+    LOAD 5
+    STORE 1030              # PCB
+    LOAD 3
+    STORE 1031              # Absolute adress of entry Point
+    LOAD 4
+    STORE 1032              # Amount of Process-Arguments
+    STORE 6                 # Working Copy
+
+    LOAD 0
+    ADDI 3
+    STORE 7                 # Pointer to first Argument source
+    LOADI 1033
+    STORE 8                 # Pointer to first Argument 
+    
+CREATE_TASK_CAL:
+    LOAD 6
+    JUMPC <= CREATE_TASK_CAD
+    SUBI 1
+    STORE 6
+    LOAD 7
+    MOVE ACC IN1
+    ADDI 1
+    STORE 7
+    LOADIN 1 0
+    STORE 9
+    LOAD 8
+    MOVE ACC IN1
+    ADDI 1
+    STORE 8
+    LOAD 9
+    STOREIN 1 0
+    JUMP CREATE_TASK_CAL
+
+CREATE_TASK_CAD:
+    LOADI 3
+    ADD 4
+    STORE 1026
+    LOADI *SCHEDULER_PREPARE_PROCESS_STACK
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOAD 5
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *KERNEL_INSERT_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1
+    STORE 1000
+    JUMP RETURN

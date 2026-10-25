@@ -1,0 +1,335 @@
+JUMP PREPARE_STACK
+SETUP:
+JUMP ASCII_SETUP
+ASCII_SETUP_RETURN:
+
+# --- SETUP ---
+LOADI 4095
+STORE 4095             # Initialisiere leeren Heap
+
+#define PCB_FRAME_SIZE      8
+#define PCB_NEXT            0
+#define PCB_PREV            1
+#define PCB_PID             2
+#define PCB_STATE           3
+#define PCB_WAIT_REASON     4
+#define PCB_WAIT_DATA       5
+#define PCB_STACK_POINTER   6
+#define PCB_STACK_BASE      7
+
+#define PCB_STATE_READY         0
+#define PCB_STATE_RUNNING       1
+#define PCB_STATE_WAITING       2
+#define PCB_STATE_TERMINATED    3
+
+SCHEDULER_SETUP:
+
+    # Prepare
+    LOADI 1
+    STORE 1000             # Set PID to KERNEL_ENTRY
+    STORE 1002              # Set Amount of Processes to 1
+
+    # Create Boot-Stack
+    LOADI 256               # Currently this supports a call-depth of ~20
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *MALLOC
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030               # <-- Boot-Stack Pointer
+    STORE 1004
+    MOVE ACC IN2
+
+    # Create Process-Controll-Block for Kernel
+    LOADI PCB_FRAME_SIZE
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *MALLOC
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    # Fill PCB with Kernel-Data
+    LOAD 1030
+    STORE 1001                  # Current PCB is this new one
+    STORE 1003                  # Kernel PCV is this new one
+    MOVE ACC IN1
+    STOREIN 1 PCB_NEXT          # NEXT_PCB is this Block itself
+    STOREIN 1 PCB_PREV          # PREV_PCB is also this Block itself
+    LOADI 1
+    STORE 1002                  # Amount of Processes, currently only Kernel
+    STOREIN 1 PCB_PID           # Store PID on PCB
+    LOADI 0
+    STOREIN 1 PCB_WAIT_REASON   # No Wait reason
+    STOREIN 1 PCB_WAIT_DATA     # No Wait Data
+    STOREIN 1 PCB_STATE         # Store "Ready"-State on PCB
+    MOVE IN2 ACC
+    STOREIN 1 PCB_STACK_POINTER     # Current Stack pointer (refresh on Process switch!)
+    LOADI 2048
+    STOREIN 1 PCB_STACK_BASE        # Stack Base
+
+    LOAD 1003                   # Kernel PCB
+    STORE 1030
+    LOADI *KERNEL_ENTRY         # Relative Offset to Kernel-Entry
+    STORE 1
+    MOVE PC ACC                 # Current Adress
+    STORE 2
+    LOAD 1
+    ADD 2
+    SUBI 2
+    STORE 1031
+    LOADI 0
+    STORE 1032
+    LOADI 3
+    STORE 1026
+    LOADI *SCHEDULER_PREPARE_PROCESS_STACK
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    # Switch to Kernel Stack
+    LOAD 1001
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_POINTER
+    MOVE ACC IN2
+
+    # Now call Free-Method on Kernel Stack
+    LOAD 1004
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *FREE
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOADI 0
+    STORE 1004
+
+    # Call Return and hope for the best
+    JUMP RETURN                 # Due to manipulated Kernel stack, this should take execution to KERNEL_ENTRY
+
+
+SCHEDULER_PREPARE_PROCESS_STACK:
+    LOADIN 1 0                  # Pointer to PCB
+    STORE 1
+    LOADIN 1 1                  # Absolute Adress of Process Entry point
+    STORE 2
+    LOADIN 1 2                  # Amount of Process-Arguments
+    STORE 3
+
+    # Process-Stack is empty. Load Stack-Base and imitate Call-Frame
+    LOAD 1
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    MOVE ACC IN1                # Pointer to Stack
+
+    # Fill IN1 and Working Registers with Zero
+    LOADI 0
+    STOREIN 1 0                 # IN1-Copy
+    STOREIN 1 1                 # M(0)-Copy
+    STOREIN 1 2
+    STOREIN 1 3
+    STOREIN 1 4
+    STOREIN 1 5
+    STOREIN 1 6
+    STOREIN 1 7
+    STOREIN 1 8
+    STOREIN 1 9
+    STOREIN 1 10                # M(9)-Copy
+    MOVE IN1 ACC
+    ADDI 11
+    STORE 4                     # Pointer to new Stack
+
+    # Copy Process-Arguments
+    LOAD 0
+    ADDI 3
+    STORE 5                     # Pointer to arguments on own Stack
+
+    LOAD 3
+    STORE 7                     # Copy of Arg-Count
+
+SCHEDULER_PREPARE_PROCESS_STACK_COLO:
+    LOAD 7                      # Amount of Args
+    JUMPC <= SCHEDULER_PREPARE_PROCESS_STACK_CODO
+    SUBI 1
+    STORE 7
+    LOAD 5
+    MOVE ACC IN1
+    LOADIN 1 0
+    STORE 6                     # Argument is on M(6)
+    MOVE IN1 ACC
+    ADDI 1
+    STORE 5
+
+    LOAD 4                      # Pointer to stack
+    MOVE ACC IN1
+    LOAD 6
+    STOREIN 1 0
+    MOVE IN1 ACC
+    ADDI 1
+    STORE 4
+    JUMP SCHEDULER_PREPARE_PROCESS_STACK_COLO
+
+SCHEDULER_PREPARE_PROCESS_STACK_CODO:
+    # Copy of Arguments is done.
+    LOAD 4
+    MOVE ACC IN1                # Points to new Stack
+    LOAD 3
+    STOREIN 1 0                 # Amount of Arguments
+    LOAD 2
+    STOREIN 1 1                 # Absolute Adress of Process Entry Point
+    MOVE IN1 ACC
+    ADDI 2
+    STORE 4                     # New Stack Pointer for PCB!
+
+    LOAD 1
+    MOVE ACC IN1
+    LOAD 4
+    STOREIN 1 PCB_STACK_POINTER
+    JUMP RETURN
+
+
+
+YIELD:
+    LOAD 1001
+    STORE 2                     # M(2) holds old PCB
+    MOVE ACC IN1
+    MOVE IN2 ACC
+    STOREIN 1 PCB_STACK_POINTER
+    LOADIN 1 PCB_STATE
+    SUBI PCB_STATE_RUNNING
+    JUMPC != 3
+    LOADI PCB_STATE_READY
+    STOREIN 1 PCB_STATE
+
+    # Check if Procces terminated itself
+    LOADIN 1 PCB_STATE
+    SUBI PCB_STATE_TERMINATED
+    STORE 6                     # M(0) holds flag for Termination
+
+    # Now goto next Process
+    LOAD 1001
+    MOVE ACC IN1
+    LOADIN 1 PCB_NEXT
+    STORE 1                     # Pointer to PCB
+YIELD_LOOP:
+    LOAD 1
+    MOVE ACC IN1
+    LOADIN 1 PCB_STATE
+    SUBI PCB_STATE_READY
+    JUMPC != YIELD_LOOK_NEXT
+    LOAD 1
+    STORE 1001                  # Update PCB Pointer
+    LOADIN 1 PCB_PID
+    STORE 1000                  # Update PID
+    LOADI PCB_STATE_RUNNING
+    STOREIN 1 PCB_STATE
+    LOADIN 1 PCB_STACK_POINTER
+    MOVE ACC IN2
+
+    # Before Jumping back to process, check if old Process terminated
+    LOAD 6
+    JUMPC != RETURN
+    # Old Process is to be terminated. If this Process is Kernel, shutdown.
+    LOAD 2
+    SUB 1003
+    JUMPC = 0                   # this is Shutdown!!!!
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SCHEDULER_DELETE_PROCESS
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    JUMP RETURN
+
+YIELD_LOOK_NEXT:
+    LOADIN 1 PCB_NEXT
+    STORE 1
+    JUMP YIELD_LOOP
+
+SCHEDULER_DELETE_PROCESS:
+    LOAD 1000
+    STORE 3                     # Store current PID
+    LOADI 1
+    STORE 1000                  # Switch to Kernel-Mode
+
+    LOADIN 1 0
+    STORE 2                     # PCB to remove
+
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_PID
+    STORE 7
+
+    LOADIN 1 PCB_NEXT
+    STORE 4
+    LOADIN 1 PCB_PREV
+    STORE 5
+    MOVE ACC IN1
+    LOAD 4
+    STOREIN 1 PCB_NEXT
+    MOVE ACC IN1
+    LOAD 5
+    STOREIN 1 PCB_PREV
+
+    # Free terminated Stack
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *FREE
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    # Free terminated PCB
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *FREE
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    # Free Heap of terminated Process
+    LOAD 7
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *FREE_PID
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOAD 1002
+    SUBI 1
+    STORE 1002
+
+    LOAD 3
+    STORE 1000
+    JUMP RETURN
+
+
+#include "stack_call_labels.txt"
+#include "malloc_labels.txt"
+#include "ascii_labels.txt"
+#include "math_labels.txt"
+#include "kernel_labels.txt"
+#include "string_methods_labels.txt"
+#include "echo_labels.txt"
