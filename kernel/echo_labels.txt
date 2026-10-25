@@ -24,6 +24,7 @@ ECHO_LOOP:
 
 
     LOAD 1030
+    STORE 2
     STORE 1030
     LOAD 0
     STORE 1031
@@ -45,4 +46,16 @@ ECHO_LOOP:
     STORE 1025
     JUMP CALL
     PRINTC '\n'
-    JUMP ECHO_LOOP
+
+    LOAD 2
+    SUBI 27
+    JUMPC != ECHO_LOOP
+
+    PRINTC "Shutdown!\n"
+    LOADI 0
+    STORE 1026
+    LOADI *SHUTDOWN
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP SHUTDOWN

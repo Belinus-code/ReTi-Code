@@ -1,0 +1,30 @@
+#define PCB_FRAME_SIZE      12
+#define PCB_NEXT            0
+#define PCB_PREV            1
+#define PCB_PID             2
+#define PCB_STATE           3
+#define PCB_WAIT_REASON     4
+#define PCB_WAIT_DATA       5
+#define PCB_STACK_POINTER   6
+#define PCB_STACK_BASE      7
+#define PCB_PARENT_PID      8
+#define PCB_EXIT_CODE       9
+#define PCB_MAILBOX         10
+#define PCB_MAILSENDER      11
+
+#define PCB_STATE_READY         0
+#define PCB_STATE_RUNNING       1
+#define PCB_STATE_WAITING       2
+#define PCB_STATE_TERMINATED    3
+
+#define PCB_WAITING_INPUT       1
+#define PCB_WAITING_OUTPUT      2
+#define PCB_WAITING_CHILD       3
+#define PCB_WAITING_MAIL        4
+
+#define KERNEL_STACKSPACE 20
+#define KERNEL_INBUF_BASE 0
+#define KERNEL_INBUF_OUTCELL 1
+#define KERNEL_INBUF_INCELL 2
+#define KERNEL_INBUF_COUNT 3
+#define KERNEL_INBUF_CONSTSIZE 128

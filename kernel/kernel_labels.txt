@@ -1,10 +1,3 @@
-#define KERNEL_STACKSPACE 20
-#define KERNEL_INBUF_BASE 0
-#define KERNEL_INBUF_OUTCELL 1
-#define KERNEL_INBUF_INCELL 2
-#define KERNEL_INBUF_COUNT 3
-#define KERNEL_INBUF_CONSTSIZE 128
-
 KERNEL_ENTRY:
     MOVE IN2 ACC
     STORE 1030                  # Start of the global cells
@@ -181,7 +174,13 @@ READ_KEY_NOWRAP:
     JUMP RETURN
 
 READ_KEY_EMPTY:
-    # If empty, do a Yield. Rn State Waiting is not supported, so gotta do a check every time
+    # If empty, do a Yield after Setting State to Waiting for Input
+    LOAD 1001
+    MOVE ACC IN1
+    LOADI PCB_STATE_WAITING
+    STOREIN 1 PCB_STATE
+    LOADI PCB_WAITING_INPUT
+    STOREIN 1 PCB_WAIT_REASON
     LOADI 0
     STORE 1026 
     LOADI *YIELD
@@ -346,3 +345,7 @@ CREATE_TASK_CAD:
     LOAD 1
     STORE 1000
     JUMP RETURN
+
+##### SHUTDOWN #####
+SHUTDOWN:
+    JUMP 0

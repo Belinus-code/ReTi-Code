@@ -32,10 +32,10 @@
     - 3: Terminated (Process is closed, PCB wants to be cleared)
  - WAIT-REASON
     - 0: No Reason (In this Case, STATE cannot be Waiting)
-    - 1: Waiting for Input
-    - 2: Waiting for Output
-    - 3: Waiting for Child-Process
-    - 4: Waiting for Mailbox
+    - 1: Waiting for Input  (Waiting that Key is available)
+    - 2: Waiting for Output (Waiting for specific Mailbox to free)
+    - 3: Waiting for Child-Process  (Waiting for specific Child-Process to terminate)
+    - 4: Waiting for Mailbox    (Waiting for Message in Mailbox)
  - WAIT-Data:
     - Waiting for Input: No Data for now
     - Waiting for Output: PID to send Mail to

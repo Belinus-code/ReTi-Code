@@ -1,3 +1,5 @@
+#include "defines.txt"
+
 JUMP PREPARE_STACK
 SETUP:
 JUMP ASCII_SETUP
@@ -6,25 +8,6 @@ ASCII_SETUP_RETURN:
 # --- SETUP ---
 LOADI 4095
 STORE 4095             # Initialisiere leeren Heap
-
-#define PCB_FRAME_SIZE      12
-#define PCB_NEXT            0
-#define PCB_PREV            1
-#define PCB_PID             2
-#define PCB_STATE           3
-#define PCB_WAIT_REASON     4
-#define PCB_WAIT_DATA       5
-#define PCB_STACK_POINTER   6
-#define PCB_STACK_BASE      7
-#define PCB_PARENT_PID      8
-#define PCB_EXIT_CODE       9
-#define PCB_MAILBOX         10
-#define PCB_MAILSENDER      11
-
-#define PCB_STATE_READY         0
-#define PCB_STATE_RUNNING       1
-#define PCB_STATE_WAITING       2
-#define PCB_STATE_TERMINATED    3
 
 SCHEDULER_SETUP:
 
@@ -227,6 +210,33 @@ YIELD_LOOP:
     LOAD 1
     MOVE ACC IN1
     LOADIN 1 PCB_STATE
+    
+    # Check if State is Waiting
+    SUBI PCB_STATE_WAITING
+    JUMPC != YIELD_NOWAIT
+    # Check if reason is Input
+    LOADIN 1 PCB_WAIT_REASON
+    SUBI PCB_WAITING_INPUT
+    JUMPC != YIELD_NOWAIT
+    # Process is waiting for input. Check if Input exists
+    MOVE IN1 ACC
+    STORE 3
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    MOVE ACC IN1
+    LOADIN 1 KERNEL_INBUF_COUNT
+    STORE 4
+    LOAD 3
+    MOVE ACC IN1                # Reset Pointer to PCB
+    LOAD 4
+    JUMPC = YIELD_NOWAIT
+    # Input available. Wake up process
+    LOADI PCB_STATE_READY
+    STOREIN 1 PCB_STATE
+
+YIELD_NOWAIT:
+    LOADIN 1 PCB_STATE
     SUBI PCB_STATE_READY
     JUMPC != YIELD_LOOK_NEXT
     LOAD 1
@@ -327,6 +337,35 @@ SCHEDULER_DELETE_PROCESS:
 
     LOAD 3
     STORE 1000
+    JUMP RETURN
+
+##### SCHEDULER_GET_PCB #####
+SCHEDULER_GET_PCB:
+    LOADIN 1 0
+    STORE 1             # PID
+    LOAD 1003
+    MOVE ACC IN1
+SCHEDULER_GET_PCB_L:
+    LOADIN 1 PCB_PID
+    SUB 1
+    JUMPC = SCHEDULER_GET_PCB_D
+    LOADIN 1 PCB_NEXT
+    MOVE ACC IN1
+    SUB 1003
+    JUMPC = SCHEDULER_GET_PCB_N
+    JUMP SCHEDULER_GET_PCB_L
+
+SCHEDULER_GET_PCB_N:
+    LOADI 0
+    MOVE ACC IN1
+
+SCHEDULER_GET_PCB_D:
+    MOVE IN1 ACC
+    STORE 1
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 0
     JUMP RETURN
 
 

@@ -1,11 +1,13 @@
-JUMP 328          
-JUMP 904        
+
+
+
+
+JUMP 398          
+JUMP 1007       
 
 # --- SETUP ---
 LOADI 4095
 STORE 4095             # Initialisiere leeren Heap
-
-
 
 
     # Prepare
@@ -18,25 +20,25 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 356    
+    LOADI 426    
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 206 
+    JUMP 276 
     LOAD 1030               # <-- Boot-Stack Pointer
     STORE 1004
     MOVE ACC IN2
 
     # Create Process-Controll-Block for Kernel
-    LOADI 8
+    LOADI 12
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 344    
+    LOADI 414    
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 194 
+    JUMP 264 
 
     # Fill PCB with Kernel-Data
     LOAD 1030
@@ -63,7 +65,7 @@ STORE 4095             # Initialisiere leeren Heap
 
     LOAD 1003                   # Kernel PCB
     STORE 1030
-    LOADI 986                   # Relative Offset to Kernel-Entry
+    LOADI 1089                  # Relative Offset to Kernel-Entry
     STORE 1
     MOVE PC ACC                 # Current Adress
     STORE 2
@@ -79,7 +81,7 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 154 
+    JUMP 224 
 
     # Switch to Kernel Stack
     LOAD 1001
@@ -92,16 +94,16 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 380  
+    LOADI 450  
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 141 
+    JUMP 211 
     LOADI 0
     STORE 1004
 
     # Call Return and hope for the best
-    JUMP 193                    # Due to manipulated Kernel stack, this should take execution to KERNEL_ENTRY
+    JUMP 263                    # Due to manipulated Kernel stack, this should take execution to KERNEL_ENTRY
 
 
     LOADIN 1 0                  # Pointer to PCB
@@ -178,7 +180,7 @@ STORE 4095             # Initialisiere leeren Heap
     MOVE ACC IN1
     LOAD 4
     STOREIN 1 6
-    JUMP 130   
+    JUMP 200   
 
 
 
@@ -197,6 +199,7 @@ STORE 4095             # Initialisiere leeren Heap
     LOADIN 1 3
     SUBI 3
     STORE 6                     # M(0) holds flag for Termination
+
     # Now goto next Process
     LOAD 1001
     MOVE ACC IN1
@@ -205,8 +208,34 @@ STORE 4095             # Initialisiere leeren Heap
     LOAD 1
     MOVE ACC IN1
     LOADIN 1 3
+    
+    # Check if State is Waiting
+    SUBI 2
+    JUMPC != 18          
+    # Check if reason is Input
+    LOADIN 1 4
+    SUBI 1
+    JUMPC != 15          
+    # Process is waiting for input. Check if Input exists
+    MOVE IN1 ACC
+    STORE 3
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 7
+    MOVE ACC IN1
+    LOADIN 1 3
+    STORE 4
+    LOAD 3
+    MOVE ACC IN1                # Reset Pointer to PCB
+    LOAD 4
+    JUMPC = 3           
+    # Input available. Wake up process
+    LOADI 0
+    STOREIN 1 3
+
+    LOADIN 1 3
     SUBI 0
-    JUMPC != 50             
+    JUMPC != 24             
     LOAD 1
     STORE 1001                  # Update PCB Pointer
     LOADIN 1 2
@@ -218,15 +247,39 @@ STORE 4095             # Initialisiere leeren Heap
 
     # Before Jumping back to process, check if old Process terminated
     LOAD 6
-    JUMPC != 98    
-    # Needs to be terminated
-    # remove this PCB out of Linked List:
+    JUMPC != 148   
+    # Old Process is to be terminated. If this Process is Kernel, shutdown.
+    LOAD 2
+    SUB 1003
+    JUMPC = 0                   # this is Shutdown!!!!
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 9                        
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 81  
+    JUMP 135   
+
+    LOADIN 1 0
+    STORE 1
+    JUMP -50       
+
     LOAD 1000
     STORE 3                     # Store current PID
     LOADI 1
     STORE 1000                  # Switch to Kernel-Mode
+
+    LOADIN 1 0
+    STORE 2                     # PCB to remove
+
     LOAD 2
     MOVE ACC IN1
+    LOADIN 1 2
+    STORE 7
+
     LOADIN 1 0
     STORE 4
     LOADIN 1 1
@@ -245,29 +298,66 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 255  
+    LOADI 285  
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 16  
+    JUMP 46  
 
     # Free terminated PCB
     LOAD 2
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 246  
+    LOADI 276  
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 7   
+    JUMP 37  
+
+    # Free Heap of terminated Process
+    LOAD 7
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 568      
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 28  
+
+    LOAD 1002
+    SUBI 1
+    STORE 1002
+
     LOAD 3
     STORE 1000
-    JUMP 59    
+    JUMP 77    
 
+##### SCHEDULER_GET_PCB #####
     LOADIN 1 0
+    STORE 1             # PID
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 2
+    SUB 1
+    JUMPC = 8                  
+    LOADIN 1 0
+    MOVE ACC IN1
+    SUB 1003
+    JUMPC = 2                  
+    JUMP -7                 
+
+    LOADI 0
+    MOVE ACC IN1
+
+    MOVE IN1 ACC
     STORE 1
-    JUMP -56       
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 0
+    JUMP 56    
 
 
 ###### CALL METHOD ######
@@ -430,7 +520,7 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 8
     STORE 9
     MOVE acc IN1
-    JUMP -345 
+    JUMP -415 
 
 ###### STACK_DUMP ######
     MOVE IN2 ACC
@@ -574,7 +664,7 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 294                
+    LOADI 327                
     STORE 1024
     MOVE PC ACC
     STORE 1025
@@ -586,7 +676,7 @@ STORE 4095             # Initialisiere leeren Heap
     JUMPC = 4                   # Kernel has Permission for everything
     LOADIN 1 1                  # LOAD PID
     SUB 1000
-    JUMPC != 403                # If Current PID isn't the same with Frame-PID, no Permission!
+    JUMPC != 436                # If Current PID isn't the same with Frame-PID, no Permission!
 
     LOADI 0
     STOREIN 1 1                 # Mark Frame as unused
@@ -689,7 +779,7 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 200                
+    LOADI 233                
     STORE 1024
     MOVE PC ACC
     STORE 1025
@@ -701,7 +791,7 @@ STORE 4095             # Initialisiere leeren Heap
     JUMPC = 4                      # Kernel has Permission for everything
     LOADIN 1 1                  # LOAD PID
     SUB 1000
-    JUMPC != 309                # If Current PID isn't the same with Frame-PID, no Permission!
+    JUMPC != 342                # If Current PID isn't the same with Frame-PID, no Permission!
 
     LOADIN 1 0
     SUBI 3                      # 3 cells needed for Header/Footer
@@ -930,9 +1020,44 @@ STORE 4095             # Initialisiere leeren Heap
     MOVE acc IN1        # put pointer into IN1
     JUMP -10        
 
-    # Der Daten-Pointer steht noch in M(1030) (von MALLOC geschrieben).
-    # Damit ist der Rückgabewert bereits an der richtigen Stelle.
     JUMP -480  
+
+##### FREE_PID #####
+    LOAD 1000
+    STORE 1
+    LOADI 1
+    STORE 1000
+
+    LOADIN 1 0
+    STORE 2
+    LOADI 4096
+    MOVE ACC IN1
+    MOVE IN1 ACC
+    SUB 4095
+    JUMPC > 20           
+    LOADIN 1 0
+    STORE 3
+    LOADIN 1 1          # PID
+    SUB 2
+    JUMPC != 11           
+    MOVE IN1 ACC
+    ADDI 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -322 
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -561
+    MOVE IN1 ACC
+    ADD 3
+    MOVE ACC IN1
+    JUMP -21       
+
+    LOAD 1
+    STORE 1000
+    JUMP -513      
 
 ##### CHECK_HEAP_POINTER #####
     LOADIN 1 0
@@ -954,7 +1079,7 @@ STORE 4095             # Initialisiere leeren Heap
     LOADIN 1 0
     SUB 2
     JUMPC != 47                
-    JUMP -500  
+    JUMP -533  
 
 ##### MEMSET #####
     LOADIN 1 0
@@ -971,7 +1096,7 @@ STORE 4095             # Initialisiere leeren Heap
     # Write Value to every Cell. No Acces check because Base Pointer maybe isnt Heap Pointer
     LOAD 2
     SUB 1
-    JUMPC < -513  
+    JUMPC < -546  
     LOAD 3
     STOREIN 1 0
     MOVE IN1 ACC
@@ -993,7 +1118,7 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -586
+    JUMP -619
 
     # Pointer seems to be valid, now check if Permission to acces Frame exists:
     LOAD 1000
@@ -1010,7 +1135,7 @@ STORE 4095             # Initialisiere leeren Heap
     MOVE ACC IN1
     LOAD 1
     STOREIN 1 0
-    JUMP -545  
+    JUMP -578  
 
 ##### SEGMENTATION_FAULT #####
     LOADIN 1 0
@@ -1038,7 +1163,7 @@ STORE 4095             # Initialisiere leeren Heap
     PRINTC 132
     PRINT 1
     PRINTC 110
-    JUMP -500      
+    JUMP -533      
 
 ##### EXCEPTION #####
     PRINTC 110
@@ -1068,7 +1193,7 @@ STORE 4095             # Initialisiere leeren Heap
     PRINTC 182
     PRINTC 133
     PRINTC 110
-    JUMP -528      
+    JUMP -561      
 
 ##### PERMISSION_DENIED #####
     PRINTC 110
@@ -1099,7 +1224,7 @@ STORE 4095             # Initialisiere leeren Heap
     PRINTC 200
     PRINTC 133
     PRINTC 110
-    JUMP -557      
+    JUMP -590      
 LOADI 99
 STORE 0
 
@@ -1111,27 +1236,27 @@ SUBI 100
 STOREIN 1 0
 SUBI 127
 JUMPC < -7              
-JUMP -913              
+JUMP -1016             
 
 ###### MIN METHOD ######
     LOADIN 1 0              # IN1 is Frame-Pointer because Call Method puts it there
     STORE 1                 # x is now at M(1)
     LOADIN 1 1
     SUB 1                   # y - x
-    JUMPC >= -644      # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
+    JUMPC >= -677      # if (y-x)>=0: y>=x -> x is already at ReturnValue Adress
     LOADIN 1 1
     STOREIN 1 0             # Store y in ReturnValue Adress
-    JUMP -647  
+    JUMP -680  
 
 ###### MAX METHOD ######
     LOADIN 1 0
     STORE 1                 # x is now at M(1)
     LOADIN 1 1
     SUB 1                   # y - x
-    JUMPC <= -652      # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
+    JUMPC <= -685      # if (y-x)<=0: y<=x -> x is already at ReturnValue Adress
     LOADIN 1 1
     STOREIN 1 0             # Store y in ReturnValue Adress
-    JUMP -655  
+    JUMP -688  
 
 ###### MUL METHOD ######
     LOADIN 1 1
@@ -1144,7 +1269,7 @@ JUMP -913
     LOADIN 1 0
     STORE 4              # original x (for sign)
     STORE 1              # |x|
-    JUMPC = -666         # x == 0: result slot already holds 0
+    JUMPC = -699         # x == 0: result slot already holds 0
     JUMPC > 4       
     LOADI 0
     SUB 4
@@ -1173,7 +1298,7 @@ JUMP -913
     MOVE acc IN1
     LOAD 3
     STOREIN 1 0
-    JUMP -695  
+    JUMP -728  
 
 ##### DIVMOD #####
     LOADIN 1 1
@@ -1220,7 +1345,7 @@ JUMP -913
     STOREIN 1 0          # quotient
     LOAD 1
     STOREIN 1 1          # remainder
-    JUMP -740  
+    JUMP -773  
 
     PRINTC 110
     PRINTC 168
@@ -1241,8 +1366,7 @@ JUMP -913
     PRINTC 211
     PRINTC 133
     PRINTC 110
-    JUMP -689      
-
+    JUMP -722      
     MOVE IN2 ACC
     STORE 1030                  # Start of the global cells
     ADDI 20
@@ -1258,7 +1382,7 @@ JUMP -913
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -830
+    JUMP -863
     
 
     # get Input Buffer
@@ -1266,11 +1390,11 @@ JUMP -913
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -329   
+    LOADI -362   
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -839
+    JUMP -872
     LOAD 1001
     MOVE ACC IN1
     LOADIN 1 7
@@ -1286,7 +1410,7 @@ JUMP -913
     LOADI 2
     STORE 1030
 
-    LOADI 586                # Relative Offset to Kernel-Entry
+    LOADI 593                # Relative Offset to Kernel-Entry
     STORE 1
     MOVE PC ACC                 # Current Adress
     ADD 1
@@ -1297,11 +1421,11 @@ JUMP -913
     STORE 1032              # Amount of Process Args
     LOADI 3
     STORE 1026
-    LOADI 153         
+    LOADI 159         
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -866
+    JUMP -899
 
 
     #LOAD 1003
@@ -1316,12 +1440,12 @@ JUMP -913
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -871
-    LOADI -946  
+    JUMP -904
+    LOADI -1049 
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -876
+    JUMP -909
     JUMP -10        
 
 ##### KERNEL_READ_INPUT #####
@@ -1363,10 +1487,10 @@ JUMP -913
     LOADIN 1 3
     ADDI 1
     STOREIN 1 3
-    JUMP -856  
+    JUMP -889  
 
     # Design choice to make. Until now, dont read input buffer
-    JUMP -857  
+    JUMP -890  
 
 ##### READ_KEY #####
     # This Function can be called by any Process, so Kernel-Context is not automatically provided!
@@ -1408,17 +1532,23 @@ JUMP -913
     MOVE ACC IN1
     LOAD 5
     STOREIN 1 0
-    JUMP -893  
+    JUMP -926  
 
-    # If empty, do a Yield. Rn State Waiting is not supported, so gotta do a check every time
+    # If empty, do a Yield after Setting State to Waiting for Input
+    LOAD 1001
+    MOVE ACC IN1
+    LOADI 2
+    STOREIN 1 3
+    LOADI 1
+    STOREIN 1 4
     LOADI 0
     STORE 1026 
-    LOADI -1025 
+    LOADI -1134 
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -955
-    JUMP -43     
+    JUMP -994
+    JUMP -49     
 
 ##### KERNEL_INSERT_PCB #####
     LOADIN 1 0
@@ -1441,21 +1571,21 @@ JUMP -913
     LOAD 1002
     ADDI 1
     STORE 1002
-    JUMP -922  
+    JUMP -961  
 
     LOADIN 1 0
     STORE 1             # PID
 
     # Allocate Heap for PCB
-    LOADI 8
+    LOADI 12
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -838   
+    LOADI -877   
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -988
+    JUMP -1027
     LOAD 1030
     STORE 2
     MOVE ACC IN1
@@ -1473,11 +1603,11 @@ JUMP -913
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -496   
+    LOADI -535   
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1006
+    JUMP -1045
     LOAD 1030
     STOREIN 1 7
     STOREIN 1 6
@@ -1486,7 +1616,7 @@ JUMP -913
     MOVE ACC IN1
     LOAD 2
     STOREIN 1 0
-    JUMP -959  
+    JUMP -998  
 
 ##### CREATE_TASK #####
     # Can be called out of any Context!
@@ -1511,7 +1641,7 @@ JUMP -913
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1033
+    JUMP -1072
 
     LOAD 1030       
     STORE 5                 
@@ -1552,11 +1682,11 @@ JUMP -913
     LOADI 3
     ADD 4
     STORE 1026
-    LOADI -1205                           
+    LOADI -1314                           
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1072
+    JUMP -1111
 
     LOAD 5
     STORE 1030
@@ -1566,17 +1696,20 @@ JUMP -913
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1081
+    JUMP -1120
     LOAD 1
     STORE 1000
-    JUMP -1029 
+    JUMP -1068 
+
+##### SHUTDOWN #####
+    JUMP 0
 ##### MERGE_HEAP_STRINGS #####
     LOADIN 1 0
     STORE 1
     LOADIN 1 1
     STORE 2
     SUB 1
-    JUMPC = -463            # In Case both Strings are the same
+    JUMPC = -470            # In Case both Strings are the same
     LOAD 1
     STORE 1030
     LOADI 1
@@ -1585,7 +1718,7 @@ JUMP -913
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1099
+    JUMP -1139
     LOAD 1030
     STORE 3
 
@@ -1597,7 +1730,7 @@ JUMP -913
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1110
+    JUMP -1150
     LOAD 1030
     ADD 3
     ADDI 1              # For Zero Terminator
@@ -1607,11 +1740,11 @@ JUMP -913
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -543   
+    LOADI -550   
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1123
+    JUMP -1163
     LOAD 1030
     SUB 3
     JUMPC >= 14                      
@@ -1622,11 +1755,11 @@ JUMP -913
     STORE 1031
     LOADI 2
     STORE 1026
-    LOADI -808    
+    LOADI -848    
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1137
+    JUMP -1177
     LOAD 1030
     STORE 1
     LOAD 1
@@ -1639,28 +1772,28 @@ JUMP -913
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1150
+    JUMP -1190
     # Now Free secondary Buffer
     LOAD 2
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -920 
+    LOADI -960 
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1159
+    JUMP -1199
     LOAD 0
     MOVE ACC IN1
     LOAD 1
     STOREIN 1 0
-    JUMP -1109 
+    JUMP -1149 
 
 ##### PRINT #####
     LOADIN 1 0
     MOVE ACC IN1
     LOADIN 1 0
-    JUMPC <= -1113 
+    JUMPC <= -1153 
     STORE 1
     PRINTC 1
     MOVE IN1 ACC
@@ -1686,7 +1819,7 @@ JUMP -913
     LOAD 2
     MOVE ACC IN1
     LOADIN 1 0
-    JUMPC = -1137 
+    JUMPC = -1177 
     STORE 3
     LOAD 1
     MOVE ACC IN1
@@ -1748,10 +1881,10 @@ JUMP -913
     LOAD 3
     STOREIN 1 0
     LOAD 4
-    JUMPC = -1194 
+    JUMPC = -1234 
     LOADI 1
     STOREIN 1 1
-    JUMP -1197 
+    JUMP -1237 
 
     LOAD 0
     MOVE ACC IN1
@@ -1759,7 +1892,7 @@ JUMP -913
     STOREIN 1 0         # Copy Max Size as return arg
     LOADI 0
     STOREIN 1 1
-    JUMP -1204 
+    JUMP -1244 
 
 ###### ATOI METHOD ######
     LOADI 0
@@ -1802,11 +1935,11 @@ JUMP -913
     STORE 1030              # Parse result to args
     LOADI 10                # -1 to negate
     STORE 1031              # store -1 to args
-    LOADI -586
+    LOADI -593
     STORE 1024
     MOVE pc acc
     STORE 1025
-    JUMP -1301
+    JUMP -1341
     LOAD 1030
     ADD 2
     STORE 4
@@ -1824,11 +1957,11 @@ JUMP -913
     STORE 1030              # Parse result to args
     LOADI -1                # -1 to negate
     STORE 1031              # store -1 to args
-    LOADI -606
+    LOADI -613
     STORE 1024
     MOVE pc acc
     STORE 1025
-    JUMP -1321
+    JUMP -1361
     LOAD 1030
     STORE 4
 
@@ -1844,7 +1977,7 @@ JUMP -913
     STOREIN 1 1
     LOAD 4
     STOREIN 1 0
-    JUMP -1281 
+    JUMP -1321 
 
 ###### ITOA METHOD ######
     LOADIN 1 0              # Integer to Convert
@@ -1904,11 +2037,11 @@ JUMP -913
     STORE 1031
     LOADI 2
     STORE 1026
-    LOADI -640   
+    LOADI -647   
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1395
+    JUMP -1435
     LOAD 1030               # quotient
     STORE 5
     JUMPC != 3              
@@ -1952,16 +2085,16 @@ JUMP -913
     MOVE IN2 ACC
     SUBI 11
     MOVE ACC IN2            # Update Stack Pointer 
-    JUMP -1382 
+    JUMP -1422 
     LOADI 32
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -1296  
+    LOADI -1336  
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1446
+    JUMP -1486
     LOAD 1030
     STORE 0
 
@@ -1969,33 +2102,55 @@ JUMP -913
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -540     
+    LOADI -547     
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1457
+    JUMP -1497
 
 
     LOAD 1030
+    STORE 2
     STORE 1030
     LOAD 0
     STORE 1031
     LOADI 2
     STORE 1026
-    LOADI -127 
+    LOADI -128 
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1468
+    JUMP -1509
 
     LOAD 0
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -308  
+    LOADI -309  
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1477
+    JUMP -1518
     PRINTC 110
-    JUMP -30      
+
+    LOAD 2
+    SUBI 27
+    JUMPC != -33      
+
+    PRINTC 183
+    PRINTC 204
+    PRINTC 217
+    PRINTC 216
+    PRINTC 200
+    PRINTC 211
+    PRINTC 219
+    PRINTC 210
+    PRINTC 133
+    PRINTC 110
+    LOADI 0
+    STORE 1026
+    LOADI -411     
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -415    
