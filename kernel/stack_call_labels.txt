@@ -1,7 +1,7 @@
 ###### CALL METHOD ######
 CALL:
     # 1. Save IN1 to Stack
-    MOVE in1 acc
+    MOVE IN1 acc
     STOREIN 2 0             # Dont Increse Stack now to save code
 
     # 2. Save M(0) to M(4) to stack
@@ -35,7 +35,7 @@ CALL_COPY_ARG_LOOP:
     JUMPC <= CALL_ARGS_DONE # If i >= n, continue
     LOADI 1030
     ADD 1027                # Address: 1030 + i
-    MOVE acc in1
+    MOVE acc IN1
     LOADIN 1 0              # Load argument from transfer area
     STOREIN 2 11             # Push to stack
     MOVE in2 acc            # Increment stack pointer
@@ -62,7 +62,7 @@ CALL_ARGS_DONE:
     # 6. Save Adress of first Argument to M(0) and IN1, just for QOL
     SUBI 2                  # Stack-Counter - 2 Points to arg_count
     SUB 1026                # Now points to first Argument
-    MOVE acc in1
+    MOVE acc IN1
     STORE 0
 
     # 7. Jump to Absolute Method Address (Offset + PC_ref - 2)
@@ -95,7 +95,7 @@ RETURN_ARG_LOOP:
     SUBI 1
     STORE 1026
     LOAD 1025
-    MOVE acc in1
+    MOVE acc IN1
     MOVE in2 acc            # Decrement stack pointer (Pop)
     SUBI 1
     MOVE acc in2
@@ -133,7 +133,7 @@ CALL_RESOTRE_REGS:
 
     # 5. Pop IN1 Pointer to IN1
     LOADIN 2 -13
-    MOVE acc in1
+    MOVE acc IN1
 
     MOVE in2 acc
     SUBI 13
@@ -165,17 +165,23 @@ PREPARE_STACK:
     STORE 7
     STORE 8
     STORE 9
-    MOVE acc in1
+    MOVE acc IN1
     JUMP SETUP
 
 ###### STACK_DUMP ######
 STACK_DUMP:
     MOVE IN2 ACC
+    SUBI 1              # Because Stack points on next Free cell!
     STORE 1
+    LOAD 1001
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    STORE 2
+    LOAD 1
     MOVE ACC IN1
 STACK_DUMP_LOOP:
     MOVE IN1 ACC
-    SUBI 2048
+    SUB 2
     JUMPC <= STACK_DUMP_DONE
     LOADIN 1 0
     STORE 0

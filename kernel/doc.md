@@ -2,16 +2,69 @@
 ## Memory Architecture
  - 0000 - 0009: Working Registers (automatic copy to stack on function-call)
  - 0100 - 0227: Ascii Lookup Table (M(100+ord(X)) = ord(X))
+ - 1000 - 1010: Multi-Tasking
  - 1024 - 2047: Calling a Method
  - 2048 - 4094: Global Stack
  - 4095 - XXXX: Heap
+
+## Multi-Tasking
+ - M(1000) cointains current PID (Process-ID)
+ - M(1001) contains Pointer to current PCB on Heap (Process-Controll-Block)
+ - M(1002) Amount of Processes 
+ - M(1003) Pointer to Kernel-PCB
+ - M(1004) Boot-Stack Pointer (Zero when Boot is done)
+
+ - PID 0 does not exist
+ - PID 1 is Kernel
+
+ ### Boot
+ - Boot-Stack of size 256
+ - Prepares Process-Controll-Block of Kernel and starts it
+ 
+ ### PCB
+ - NEXT_PCB (Points to first if this is last PCB)
+ - PREV_PCB (Points to last if this if first PCB)
+ - PID
+ - STATE
+    - 0: Ready (Waiting for runtime)
+    - 1: Running (currently running)
+    - 2: Waiting ()
+    - 3: Terminated (Process is closed, PCB wants to be cleared)
+ - WAIT-REASON
+    - 0: No Reason (In this Case, STATE cannot be Waiting)
+    - 1: Waiting for Input
+    - 2: Waiting for Output
+    - 3: Waiting for other Process
+ - WAIT-Data:
+    - Wait-Reason specific. For example, is reason is "waiting for other Process", this would be PID of other Process
+ - STACK-POINTER
+ - STACK-BASE
+
+ - Every Process can read it's own PCB to use its data. However, it is only allowed to Manipulate STATE, WAIT-REASON and WAIT-DATA.
+
+ ### YIELD
+  - Is a callable Function without any Arguments
+  - If current Process is STATE_RUNNING, its set to STATE_READY
+  - Otherwise it stays untouched
+  - Stores Stack Pointer on PCB
+  - Looks for next Ready Process
+  - Loads Stackpointer from next Process
+  - If old Process Terminated:
+    - Switch to kernel Mode
+    - Remove old PCB out of linked List
+    - Free old stack and PCB
+  - Return to new Process
+  - For now there is no rescue from a deadlock
+
+
 ## Stack
-1. Stack starts at M(2048)
+1. Scheduler-Stack starts at M(2048). Process-Specific Stacks are to be allocated on Heap
 2. Stack Pointer is *always* at IN2
 3. Stack Pointer always points to next free cell
 4. Stack grows upwards (Pointer gets bigger)
 
 ## STACK_DUMP
+ !! Currently not working due to switch to Multiple Stacks with Multi-Tasking !!
  - Not a Method, rather a last Resort Label
  - Loads Stack Pointer, Prints everything starting at stack top
  - Goes until 2048 for now, on multithread system for later not sure
@@ -39,10 +92,10 @@
 ### HEAP
 - Heap startes at M(4096)
 - No Heap end right now?
-- Heap Top Pointer is at M(4095) and points to beginn of last frame, not to real end
+- Heap Top Pointer is at M(4095) and points to beginn of last frame, not to real end (points to 4095 if heap is emtpy)
 - Every Heap frame with n data cells consists of:
     - M(H): Length of Heap Frame (n+3)
-    - M(H+1): Is Frame used? (0: not used, 1: used)
+    - M(H+1): Is Frame used? (0: not used, else: PID of Process allocating this Frame (PID is always != 0))
     - M(H+2) to M(H+2+n)
     - M(H+3+n): Length of Heap Frame (n+3)
 - Heap Block size is currently limited to 1GB (=1.073.741.824) (to protect pyhton emulator and simulate a 32-Bit system)
@@ -99,6 +152,7 @@ Same as Malloc(n) but filles complete Block with zeros.
 - For easy Print, every Ascii Character is stored in M(<char value> + 100)
     - E.g.: a = M(197) because ord(a) = 97 -> 97 + 100 = 197
 - Every String ends with a Zero Terminator (=0)
+- Following Functions are mostly not important for the os, rather written for a shell that might be implemented in the future.
 ## ATOI
     - 1. Argument: Pointer to String Buffer
     - 2. Argument (Optional): Offset to first Digit (Zero if not provided)

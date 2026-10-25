@@ -23,35 +23,106 @@ MAX:
 ###### MUL METHOD ######
 MUL:
     LOADIN 1 1
-    STORE 2             # y Value
+    STORE 5              # original y (for sign)
+    STORE 2              # |y|
     JUMPC >= MULCHECKX
     LOADI 0
-    SUB 2
-    STORE 2             # If y<0 negate y
+    SUB 5
+    STORE 2
 MULCHECKX:
     LOADIN 1 0
-    STORE 1
-    LOADIN 1 1
-    JUMPC = RETURN      # if x is zero, zero is in return_adr, so return
-    JUMPC >= MULSTART
+    STORE 4              # original x (for sign)
+    STORE 1              # |x|
+    JUMPC = RETURN       # x == 0: result slot already holds 0
+    JUMPC > MULSTART
     LOADI 0
-    SUB 1
+    SUB 4
     STORE 1
 MULSTART:
-    LOADI 0             # Start with Zero
+    LOADI 0
     STORE 3
 MUL_LOOP:
     LOAD 2
-    JUMPC <= MUL_DONE
+    JUMPC <= MUL_SIGN
     SUBI 1
     STORE 2
     LOAD 3
     ADD 1
     STORE 3
     JUMP MUL_LOOP
+MUL_SIGN:
+    LOAD 4
+    JUMPC > MUL_CHECKY
+    LOADI 0
+    SUB 3
+    STORE 3              # x < 0: negate result
+MUL_CHECKY:
+    LOAD 5
+    JUMPC >= MUL_DONE
+    LOADI 0
+    SUB 3
+    STORE 3              # y < 0: negate result
 MUL_DONE:
     LOAD 0
-    MOVE acc in1
+    MOVE acc IN1
     LOAD 3
     STOREIN 1 0
     JUMP RETURN
+
+##### DIVMOD #####
+DIVMOD:
+    LOADIN 1 1
+    JUMPC = DIVISION_BY_ZERO       # b == 0: abort
+    STORE 5              # keep original b for sign
+    STORE 2              # |b|
+    JUMPC > DIVCHECKA
+    LOADI 0
+    SUB 5
+    STORE 2              # b < 0: negate
+DIVCHECKA:
+    LOADIN 1 0
+    STORE 4              # keep original a for sign
+    STORE 1              # |a|, becomes the remainder
+    JUMPC >= DIVSTART
+    LOADI 0
+    SUB 4
+    STORE 1              # a < 0: negate
+DIVSTART:
+    LOADI 0
+    STORE 3              # quotient = 0
+DIV_LOOP:
+    LOAD 1
+    SUB 2                # acc = rem - |b|
+    JUMPC < DIV_SIGN     # rem < |b|: done
+    STORE 1              # rem = rem - |b|
+    LOAD 3
+    ADDI 1
+    STORE 3              # quotient++
+    JUMP DIV_LOOP
+DIV_SIGN:
+    LOAD 4
+    JUMPC >= DIV_CHECKB  # a >= 0: nothing to fix
+    LOADI 0
+    SUB 3
+    STORE 3              # a < 0: negate quotient
+    LOADI 0
+    SUB 1
+    STORE 1              # remainder gets sign of a
+DIV_CHECKB:
+    LOAD 5
+    JUMPC > DIV_DONE
+    LOADI 0
+    SUB 3
+    STORE 3              # b < 0: negate quotient
+DIV_DONE:
+    LOAD 0
+    MOVE acc IN1
+    LOAD 3
+    STOREIN 1 0          # quotient
+    LOAD 1
+    STOREIN 1 1          # remainder
+    JUMP RETURN
+
+DIVISION_BY_ZERO:
+    PRINTC "\nDivision by Zero!\n"
+    JUMP STACK_DUMP

@@ -10,7 +10,7 @@ JUMPC <= nIs1or2    # Jump if n <= 2
 STORE 30
 LOADI 1
 STORE 0
-MOVE acc in1        # Store f(0) = f(1) = 1 in M(0) and IN1
+MOVE acc IN1        # Store f(0) = f(1) = 1 in M(0) and IN1
 
 # f(n-1) is stored in IN1, f(n-2) is stored in M(0)
 # To copy f(n-1) to M(0) after calculating f(n) while not using IN2,

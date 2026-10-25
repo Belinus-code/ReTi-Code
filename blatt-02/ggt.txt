@@ -33,7 +33,7 @@ STORE 1
 STORE 2
 STORE 3
 STORE 4
-MOVE acc in1
+MOVE acc IN1
 
 LOADI 6
 STORE 40                # Store First Argument in M(40) as statet in Exersice
@@ -141,7 +141,7 @@ JUMP 46
 ###### CALL METHOD ######
 
 # 1. Save IN1 to Stack
-MOVE in1 acc
+MOVE IN1 acc
 STOREIN 2 0             # Dont Increse Stack now to save code
 
 # 2. Save M(0) to M(4) to stack
@@ -164,7 +164,7 @@ SUB 1027
 JUMPC <= 13             # If i >= n, continue
 LOADI 1030
 ADD 1027                # Address: 1030 + i
-MOVE acc in1
+MOVE acc IN1
 LOADIN 1 0              # Load argument from transfer area
 STOREIN 2 6             # Push to stack
 MOVE in2 acc            # Increment stack pointer
@@ -190,7 +190,7 @@ MOVE acc in2
 # 6. Save Adress of first Argument to M(0), just for QOL
 SUBI 2                  # Stack-Counter - 2 Points to arg_count
 SUB 1026                # Now points to first Argument
-MOVE acc in1
+MOVE acc IN1
 STORE 0
 
 # 7. Jump to Absolute Method Address (Offset + PC_ref - 2)
@@ -220,7 +220,7 @@ JUMPC <= 14
 SUBI 1
 STORE 1026
 LOAD 1025
-MOVE acc in1
+MOVE acc IN1
 MOVE in2 acc            # Decrement stack pointer (Pop)
 SUBI 1
 MOVE acc in2
@@ -245,7 +245,7 @@ STORE 0
 
 # 5. Pop IN1 Pointer to IN1
 LOADIN 2 -8
-MOVE acc in1
+MOVE acc IN1
 
 MOVE in2 acc
 SUBI 8

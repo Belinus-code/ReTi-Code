@@ -783,38 +783,14 @@ PRINTC 208
 
 
 LOADIN 2 STACK_BUFFER_POINTER
-STORE 0
-
-PRINT_STRING:
-    LOAD 0             # Lade den Start-Pointer aus M(0)
-    MOVE ACC IN1       # Kopiere ihn nach IN1 (unser Basis-Register)
-
-STRING_LOOP:
-    LOADIN 1 0         # Lädt M(IN1 + M(1)) -> Also das aktuelle Zeichen
-    STORE 2            # Sichere das Zeichen kurz in M(2)
-    
-    # Prüfe auf den Null-Terminator (\0)
-    JUMPC = STRING_DONE # Wenn ACC == 0 ist, sind wir am Ende des Strings!
-
-    # Zeichen ausgeben
-    PRINTC 2           # Printe das Zeichen aus M(2)
-
-    # Offset erhöhen für das nächste Zeichen
-    MOVE IN1 ACC
-    ADDI 1
-    MOVE ACC IN1
-    
-    JUMP STRING_LOOP   # Nächster Schleifendurchlauf
-
-STRING_DONE:
-    # Hier geht es weiter, wenn der String komplett gedruckt wurde
-    # z.B. einen Zeilenumbruch hinterherjagen:
-    LOADI 13
-    STORE 2
-    PRINTC 2
-    LOADI 10
-    STORE 2
-    PRINTC 2
+STORE 1030
+LOADI 1
+STORE 1026
+LOADI *PRINT
+STORE 1024
+MOVE PC ACC
+STORE 1025
+JUMP CALL
 
 PRINTC 113
 PRINTC 110
@@ -868,99 +844,11 @@ PRINT 0
 
 JUMP 0
 
-###### ATOI METHOD ######
-ATOI:
-LOADI 0
-STORE 4
-STORE 5
-LOADIN 1 0              # Pointer to String
-STORE 1
-LOADIN 2 -2
-STORE 2
-SUBI 1                  # If only one argument, then skip following
-JUMPC = ATOI_NO_OFFSET
-LOADIN 1 1              # Load offset
-STORE 3
-LOAD 1
-ADD 3
-STORE 1
-
-ATOI_NO_OFFSET:
-LOAD 1
-MOVE ACC IN1
-LOADIN 1 0
-SUB 145                 # Ascii '-' (negative Value)
-STORE 3                 # M(3) is zero if first char is negative, != 0 if not
-JUMPC != ATOI_PARSE_LOOP
-LOAD 1
-ADDI 1
-STORE 1
-
-ATOI_PARSE_LOOP:
-LOAD 1
-MOVE ACC IN1
-LOADIN 1 0
-SUBI 48
-STORE 2
-JUMPC < ATOI_END_FOUND
-SUBI 9
-JUMPC > ATOI_END_FOUND
-# Call multiply method and multiply old buffer by ten, then add number to buffer
-LOADI 2                 # 2 Arguments
-STORE 1026
-LOAD 4                  # Load Result of parser
-STORE 1030              # Parse result to args
-LOADI 10                # -1 to negate
-STORE 1031              # store -1 to args
-LOADI *MUL
-STORE 1024
-MOVE pc acc
-STORE 1025
-JUMP CALL
-LOAD 1030
-ADD 2
-STORE 4
-LOAD 1
-ADDI 1
-STORE 1
-JUMP ATOI_PARSE_LOOP
 
 
-ATOI_END_FOUND:
-LOAD 3
-JUMPC != ATOI_END       # Jump if no - found before number
-LOADI 2                 # 2 Arguments
-STORE 1026
-LOAD 4                  # Load Result of parser
-STORE 1030              # Parse result to args
-LOADI -1                # -1 to negate
-STORE 1031              # store -1 to args
-LOADI *MUL
-STORE 1024
-MOVE pc acc
-STORE 1025
-JUMP CALL
-LOAD 1030
-STORE 4
 
-ATOI_END:
-LOAD 0
-MOVE ACC IN1
-LOADIN 2 -2
-SUBI 1
-JUMPC = ATOI_NO_OFFSET_RET
-LOADIN 1 0
-STORE 2
-LOAD 1
-SUB 2
-STOREIN 1 1
-ATOI_NO_OFFSET_RET:
-LOAD 4
-STOREIN 1 0
-JUMP RETURN
 
-###### ITOA METHOD ######
-LOAD
+
 
 ###### GET_SCREEN_SIZE METHOD ######
 GET_SCREEN_SIZE:
@@ -1581,204 +1469,9 @@ PRINTC 127
 PRINTC '8'          # Restore saved Cursor Position
 JUMP RETURN
 
-###### GET_STRING_SIZE ######
-GET_STRING_SIZE:
-LOADI 0
-STORE 3                 # Counter for Size
-STORE 4                 # Flag if Max-size if given
-LOADIN 1 0
-STORE 1
-LOADIN 2 -2             # Load Arg Count
-SUBI 1
-JUMPC = GET_STRING_SIZE_NO_LIMIT
-LOADI 1
-STORE 4                 # Set Flag
-LOADIN 1 1
-ADD 1
-SUBI 1
-STORE 2                 # Last Cell within String
-LOAD 1
-MOVE ACC IN1
-
-GET_STRING_SIZE_LOOP1:
-LOADIN 1 0
-JUMPC = GET_STRING_SIZE_DONE
-MOVE IN1 ACC
-ADDI 1
-MOVE ACC IN1
-STORE 5
-LOAD 4
-JUMPC = GET_STRING_SIZE_SKIP_LIMIT_CHECK
-LOAD 5
-SUB 2
-JUMPC > GET_STRING_SIZE_ERR
-GET_STRING_SIZE_SKIP_LIMIT_CHECK:
-LOAD 3
-ADDI 1
-STORE 3
-JUMP GET_STRING_SIZE_LOOP1
-
-GET_STRING_SIZE_NO_LIMIT:
-LOAD 1
-MOVE ACC IN1
-GET_STRING_SIZE_LOOP2:
-LOADIN 1 0
-JUMPC = GET_STRING_SIZE_DONE
-MOVE IN1 ACC
-ADDI 1
-MOVE ACC IN1
-LOAD 3
-ADDI 1
-STORE 3
-JUMP GET_STRING_SIZE_LOOP2
-
-GET_STRING_SIZE_DONE:
-LOAD 0
-MOVE ACC IN1
-LOAD 3
-STOREIN 1 0
-LOAD 4
-JUMPC = RETURN
-LOADI 1
-STOREIN 1 1
-JUMP RETURN
-
-GET_STRING_SIZE_ERR:
-LOAD 0
-MOVE ACC IN1
-LOADIN 1 1
-STOREIN 1 0         # Copy Max Size as return arg
-LOADI 0
-STOREIN 1 1
-JUMP RETURN
-
-###### STRCAT ######
-STRCAT:
-    LOADIN 1 0
-    STORE 1             # Pointer to Main String
-    LOADIN 1 1
-    STORE 2             # Pointer to Secondary String
-    LOAD 1
-    MOVE ACC IN1
-SRTCAT_LOOP1:
-    LOADIN 1 0
-    JUMPC = STRCAT_FIRST_ZERO
-    MOVE IN1 ACC
-    ADDI 1
-    MOVE ACC IN1
-    JUMP SRTCAT_LOOP1
-STRCAT_FIRST_ZERO:
-    MOVE IN1 ACC
-    STORE 1
-STRCAT_LOOP2:
-    LOAD 2
-    MOVE ACC IN1
-    LOADIN 1 0
-    JUMPC = RETURN
-    STORE 3
-    LOAD 1
-    MOVE ACC IN1
-    LOAD 3
-    STOREIN 1 0
-    MOVE IN1 ACC
-    ADDI 1
-    STORE 1
-    JUMP STRCAT_LOOP2
-
-##### MERGE_HEAP_STRINGS #####
-MERGE_HEAP_STRINGS:
-    LOADIN 1 0
-    STORE 1
-    LOADIN 1 1
-    STORE 2
-    SUB 1
-    JUMPC = EXCEPTION       # In Case both Strings are the same
-    LOAD 1
-    STORE 1030
-    LOADI 1
-    STORE 1026
-    LOADI *GET_STRING_SIZE
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP CALL
-    LOAD 1030
-    STORE 3
-
-    LOAD 2
-    STORE 1030
-    LOADI 1
-    STORE 1026
-    LOADI *GET_STRING_SIZE
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP CALL
-    LOAD 1030
-    ADD 3
-    ADDI 1              # For Zero Terminator
-    STORE 3             # M(3) holds needed size
-
-    LOAD 1
-    STORE 1030
-    LOADI 1
-    STORE 1026
-    LOADI *SIZEOF
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP CALL
-    LOAD 1030
-    SUB 3
-    JUMPC >= MERGE_HEAP_STRINGS_NOMAL
-    # Need to realloc Main Buffer
-    LOAD 1
-    STORE 1030
-    LOAD 3
-    STORE 1031
-    LOADI 2
-    STORE 1026
-    LOADI *REALLOC
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP CALL
-    LOAD 1030
-    STORE 1
-MERGE_HEAP_STRINGS_NOMAL:
-    LOAD 1
-    STORE 1030
-    LOAD 2
-    STORE 1031
-    LOADI 2
-    STORE 1026
-    LOADI *STRCAT
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP CALL
-    # Now Free secondary Buffer
-    LOAD 2
-    STORE 1030
-    LOADI 1
-    STORE 1026
-    LOADI *FREE
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP CALL
-    LOAD 0
-    MOVE ACC IN1
-    LOAD 1
-    STOREIN 1 0
-    JUMP RETURN
-
-
-
-
-
 
 #include "stack_call_labels.txt"
 #include "malloc_labels.txt"
 #include "ascii_labels.txt"
 #include "math_labels.txt"
+#include "string_methods_labels.txt"

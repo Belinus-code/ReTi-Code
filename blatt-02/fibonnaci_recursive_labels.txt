@@ -58,7 +58,7 @@ FIBONNACI_n:
 MOVE in2 acc
 SUBI 8          # Argument is at Stack-Pointer - 8
 STORE 0         # Store Pointer to Arg at M(0)
-MOVE acc in1
+MOVE acc IN1
 LOADIN 1 0
 STORE 1         # Store Arg n at M(1)
 
@@ -96,7 +96,7 @@ STORE 1025
 JUMP CALL
 
 LOAD 0          # Load Pointer to Return-value on Stack
-MOVE acc in1
+MOVE acc IN1
 
 LOAD 1030
 ADD 2           # ACC = f(n - 1) + f(n - 2)
@@ -127,7 +127,7 @@ SUB 1027
 JUMPC <= CALL_SAVE_REGS # If i >= n, start saving registers
 LOADI 1030
 ADD 1027                # Address: 1030 + i
-MOVE acc in1
+MOVE acc IN1
 LOADIN 1 0               # Load argument from transfer area
 STOREIN 2 0              # Push to stack
 MOVE in2 acc            # Increment stack pointer
@@ -147,7 +147,7 @@ LOADI 5
 SUB 1027
 JUMPC <= CALL_SAVE_CONTROL
 LOAD 1027
-MOVE acc in1            # Point to M(0...4)
+MOVE acc IN1            # Point to M(0...4)
 LOADIN 1 0
 STOREIN 2 0              # Push register to stack
 MOVE in2 acc            # Increment stack pointer
@@ -202,7 +202,7 @@ STORE 1027              # Start at register 4
 CALL_RESTORE_REGS_LOOP:
 LOAD 1027
 JUMPC < CALL_PREP_ARG_RETURN # If counter < 0, done
-MOVE acc in1            # Target register
+MOVE acc IN1            # Target register
 MOVE in2 acc            # Decrement stack pointer (Pop)
 SUBI 1
 MOVE acc in2
@@ -226,7 +226,7 @@ JUMPC <= CALL_RETURN_DONE
 SUBI 1
 STORE 1026
 LOAD 1025
-MOVE acc in1
+MOVE acc IN1
 MOVE in2 acc            # Decrement stack pointer (Pop)
 SUBI 1
 MOVE acc in2
