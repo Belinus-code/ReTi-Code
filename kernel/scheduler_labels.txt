@@ -7,7 +7,7 @@ ASCII_SETUP_RETURN:
 LOADI 4095
 STORE 4095             # Initialisiere leeren Heap
 
-#define PCB_FRAME_SIZE      8
+#define PCB_FRAME_SIZE      12
 #define PCB_NEXT            0
 #define PCB_PREV            1
 #define PCB_PID             2
@@ -16,6 +16,10 @@ STORE 4095             # Initialisiere leeren Heap
 #define PCB_WAIT_DATA       5
 #define PCB_STACK_POINTER   6
 #define PCB_STACK_BASE      7
+#define PCB_PARENT_PID      8
+#define PCB_EXIT_CODE       9
+#define PCB_MAILBOX         10
+#define PCB_MAILSENDER      11
 
 #define PCB_STATE_READY         0
 #define PCB_STATE_RUNNING       1

@@ -34,11 +34,26 @@
     - 0: No Reason (In this Case, STATE cannot be Waiting)
     - 1: Waiting for Input
     - 2: Waiting for Output
-    - 3: Waiting for other Process
+    - 3: Waiting for Child-Process
+    - 4: Waiting for Mailbox
  - WAIT-Data:
-    - Wait-Reason specific. For example, is reason is "waiting for other Process", this would be PID of other Process
+    - Waiting for Input: No Data for now
+    - Waiting for Output: PID to send Mail to
+    - Waiting for Child-Process: Child-PID
+    - Waiting for Mailbox: No Data for now
  - STACK-POINTER
  - STACK-BASE
+ - PARENT-PID
+    - Creator of this Process
+    - Only Parent and Kernel can kill this Process
+    - Only Parent and Kernel can wait & read Exit-Code
+ - EXIT-CODE
+    - If a Process exits itself, it can write a value in here
+    - If a process gets Terminated, this gets set to -1
+ - MAILBOX
+    - Every Process can write a value here
+ - MAILSENDER
+    - When a Process is writing a Message into MAILBOX, write its PID into here!
 
  - Every Process can read it's own PCB to use its data. However, it is only allowed to Manipulate STATE, WAIT-REASON and WAIT-DATA.
 
