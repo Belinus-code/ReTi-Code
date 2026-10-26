@@ -57,6 +57,7 @@
     - PID 0 means Mailbox is empty and can be written to. 
 
  - Every Process can read it's own PCB to use its data. However, it is only allowed to Manipulate STATE, WAIT-REASON and WAIT-DATA.
+ - PCBs are aranged in a double linked list (next & previous). The List is ordered by the PIDs of the PCBs, starting at 1 (kernel) going up to the biggest
 
  ### CREATE_TASK
  - Takes absolute Entry Point and Parent PID as Arguments
@@ -65,6 +66,16 @@
  - Parent PID can be PID of Callee or PID of Kernel
  - PID gets automatically asigned by looking for smallest available PID
  - Returns the new PID once Task is created
+
+ ### Creating a Task
+ - First check if the desired Parent PID is valid (either current PID or Kernel)
+ - The smallest available PID gets looked up in the PCB Chain
+ - A PCB is created with the new PID, a new Stack gets allocated
+ - Stack-Size if 256 for now, mabye make this an argument in the future
+ - The Parent PID gets stored on the PCB, as well as Stack pointers
+ - State gets set to READY
+ - Stack gets Prepared with a manual Call Frame in order to be able to RETURN in this Stack. For this, the absolute Entry Point of the Task will be placed in that Frame
+ - PCB gets linked at the correct Place in the linked chain
 
  ### Terminating a Task
  - Terminating or Exiting a Task is complicated and descriped here. This is not a Method-Description!
@@ -80,6 +91,7 @@
  - What SCHEDULER_DELETE_PROCESS does:
     - Clear Processes Stack and all its Heap, set Stack-base and Stack pointer to 0
     - Terminate all Childrends (Iterativ, not recursive!)
+        - Delete them completey. Exit Code not needed because Parent is already Terminated
     - Check if any Process Output-Waits for this Process
         - Set its WAITING-DATA to Zero (was the PID of the process it wants to send to before)
     - Check if Parent is Wainting for this Process
@@ -95,12 +107,14 @@
  ### YIELD
   - Is a callable Function without any Arguments
   - If current Process is STATE_RUNNING, its set to STATE_READY
-  - Otherwise it stays untouched
+  - Otherwise it stays untouched, for example if its wainting or terminated
   - Stores Stack Pointer on PCB
+    - Checks for Stack-Overflow! #TODO
   - Looks for next Ready Process
   - Loads Stackpointer from next Process
   - If old Process Terminated:
     - Switch to kernel Mode
+    - Switch to kernel Stack #TODO
     - Remove old PCB out of linked List
     - Free old stack and PCB
   - Return to new Process
