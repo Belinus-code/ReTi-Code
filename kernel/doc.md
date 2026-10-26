@@ -57,6 +57,13 @@
 
  - Every Process can read it's own PCB to use its data. However, it is only allowed to Manipulate STATE, WAIT-REASON and WAIT-DATA.
 
+ ### CREATE_TASK
+ - Takes absolute Entry Point and Parent PID as Arguments
+ - Followed by that comes Amount of Process Arguments
+ - Place any Process-Arguments, then call.
+ - Parent PID can be PID of Callee or PID of Kernel
+ - PID gets automatically asigned by looking for smallest available PID
+
  ### YIELD
   - Is a callable Function without any Arguments
   - If current Process is STATE_RUNNING, its set to STATE_READY

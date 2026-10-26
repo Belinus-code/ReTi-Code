@@ -39,8 +39,8 @@ KERNEL_ENTRY:
     STOREIN 1 KERNEL_INBUF_COUNT
 
     # Now create ECHO Process for Testing
-    LOADI 2
-    STORE 1030
+    LOADI 1                 
+    STORE 1030              # Store Parent PID
 
     LOADI *ECHO_ENTRY        # Relative Offset to Kernel-Entry
     STORE 1
@@ -193,22 +193,38 @@ READ_KEY_EMPTY:
 ##### KERNEL_INSERT_PCB #####
 KERNEL_INSERT_PCB:
     LOADIN 1 0
-    STORE 1             # Pointer to new PCB
+    STORE 1                     # Pointer to new PCB
+    MOVE ACC IN1
+    LOADIN 1 PCB_PID
+    STORE 2                     # PID of new PCB
     LOAD 1003
-    MOVE ACC IN1
-    LOADIN 1 PCB_PREV
-    STORE 2
+    MOVE ACC IN1                # Start at Kernel-PCB
+KERNEL_INSERT_PCB_L:
+    MOVE IN1 ACC
+    STORE 3                     # current = candidate for predecessor
+    LOADIN 1 PCB_NEXT
+    MOVE ACC IN1                # IN1 = next
+    SUB 1003
+    JUMPC = KERNEL_INSERT_PCB_D # next is Kernel again: insert at the end
+    LOADIN 1 PCB_PID
+    SUB 2
+    JUMPC > KERNEL_INSERT_PCB_D # next has bigger PID: insert before it
+    JUMP KERNEL_INSERT_PCB_L
+
+KERNEL_INSERT_PCB_D:
+    MOVE IN1 ACC
+    STORE 4                     # old next
     LOAD 1
-    STOREIN 1 PCB_PREV
-    LOAD 2
+    STOREIN 1 PCB_PREV          # old next.prev = new
+    LOAD 3
     MOVE ACC IN1
     LOAD 1
-    STOREIN 1 PCB_NEXT
-    MOVE ACC IN1
-    LOAD 1003
-    STOREIN 1 PCB_NEXT
-    LOAD 2
-    STOREIN 1 PCB_PREV
+    STOREIN 1 PCB_NEXT          # predecessor.next = new
+    MOVE ACC IN1                # IN1 = new
+    LOAD 3
+    STOREIN 1 PCB_PREV          # new.prev = predecessor
+    LOAD 4
+    STOREIN 1 PCB_NEXT          # new.next = old next
     LOAD 1002
     ADDI 1
     STORE 1002
@@ -239,6 +255,9 @@ KERNEL_CREATE_PCB:
     STOREIN 1 PCB_STATE
     STOREIN 1 PCB_WAIT_REASON
     STOREIN 1 PCB_WAIT_DATA
+    STOREIN 1 PCB_EXIT_CODE
+    STOREIN 1 PCB_MAILBOX
+    STOREIN 1 PCB_MAILSENDER
 
     # Allocate Heap for Stack
     LOADI 256
@@ -269,14 +288,38 @@ CREATE_TASK:
     STORE 1000          # Switch to Kernel Mode
 
     LOADIN 1 0
-    STORE 2             # New PID
+    STORE 2             # Parent PID
     LOADIN 1 1
     STORE 3             # Absolute Adress of Entry Point
     LOADIN 1 2
     STORE 4             # Amount of Process Arguments
 
-    # Create & Prepare PCB
+    # Check if Parent-PID is Valid (either PID of current Process or Kernel)
     LOAD 2
+    SUB 1
+    JUMPC = CREATE_TASK_VALPID
+    LOAD 2
+    SUBI 1
+    JUMPC = CREATE_TASK_VALPID
+    LOAD 1
+    STORE 1000
+    JUMP EXCEPTION
+
+CREATE_TASK_VALPID:
+    LOADI 1
+    STORE 1026
+    LOADI 0
+    STORE 1030
+    LOADI *SCHEDULER_FIND_FREE_PID
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    STORE 9             # PID of new Process
+
+    # Create & Prepare PCB
+    LOAD 9
     STORE 1030
     LOADI 1
     STORE 1026
@@ -287,7 +330,14 @@ CREATE_TASK:
     JUMP CALL
 
     LOAD 1030       
-    STORE 5                 
+    STORE 5                 # Pointer to new PCB
+
+    # Set Parent and Exit-Code
+    MOVE ACC IN1
+    LOAD 2                  # Parent PID
+    STOREIN 1 PCB_PARENT_PID
+    LOAD 9
+    STORE 2
 
     # Now prepare new Stack.
     LOAD 5
@@ -344,6 +394,11 @@ CREATE_TASK_CAD:
     JUMP CALL
     LOAD 1
     STORE 1000
+
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 2              # New PID
+    STOREIN 1 0
     JUMP RETURN
 
 ##### SHUTDOWN #####

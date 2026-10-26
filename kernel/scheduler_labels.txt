@@ -55,6 +55,10 @@ SCHEDULER_SETUP:
     STOREIN 1 PCB_WAIT_REASON   # No Wait reason
     STOREIN 1 PCB_WAIT_DATA     # No Wait Data
     STOREIN 1 PCB_STATE         # Store "Ready"-State on PCB
+    STOREIN 1 PCB_EXIT_CODE
+    STOREIN 1 PCB_MAILBOX
+    STOREIN 1 PCB_MAILSENDER
+    STOREIN 1 PCB_PARENT_PID    # Kernel has Parent PID 0!
     MOVE IN2 ACC
     STOREIN 1 PCB_STACK_POINTER     # Current Stack pointer (refresh on Process switch!)
     LOADI 2048
@@ -368,6 +372,33 @@ SCHEDULER_GET_PCB_D:
     STOREIN 1 0
     JUMP RETURN
 
+
+SCHEDULER_FIND_FREE_PID:
+    LOAD 1003
+    MOVE ACC IN1            # Kernel-PCB
+    LOADI 2
+    STORE 1                 # expected PID 
+SCHEDULER_FIND_FREE_PID_L:
+    MOVE IN1 ACC
+    STORE 2                 
+    LOADIN 1 PCB_NEXT
+    MOVE ACC IN1            # next PCB
+    SUB 1003
+    JUMPC = SCHEDULER_FIND_FREE_PID_D   # If PCB is Kernel again, stop
+    LOADIN 1 PCB_PID
+    SUB 1
+    JUMPC != SCHEDULER_FIND_FREE_PID_D  # PID is bigger than its index, so index is free
+    LOAD 1
+    ADDI 1
+    STORE 1
+    JUMP SCHEDULER_FIND_FREE_PID_L
+
+SCHEDULER_FIND_FREE_PID_D:
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 0              # new PID
+    JUMP RETURN
 
 #include "stack_call_labels.txt"
 #include "malloc_labels.txt"
