@@ -51,9 +51,10 @@
     - If a Process exits itself, it can write a value in here
     - If a process gets Terminated, this gets set to -1
  - MAILBOX
-    - Every Process can write a value here
+    - Every Process can write a value here if MAILSENDER is 0. Else, set Sender to Waiting for Output
  - MAILSENDER
     - When a Process is writing a Message into MAILBOX, write its PID into here!
+    - PID 0 means Mailbox is empty and can be written to. 
 
  - Every Process can read it's own PCB to use its data. However, it is only allowed to Manipulate STATE, WAIT-REASON and WAIT-DATA.
 
@@ -63,6 +64,33 @@
  - Place any Process-Arguments, then call.
  - Parent PID can be PID of Callee or PID of Kernel
  - PID gets automatically asigned by looking for smallest available PID
+ - Returns the new PID once Task is created
+
+ ### Terminating a Task
+ - Terminating or Exiting a Task is complicated and descriped here. This is not a Method-Description!
+ - What Exit does:
+    - Set Exit Code 
+    - Set State to TERMINATED
+    - Call YIELD
+        - YIELD will then automatically call SCHEDULER_DELETE_PROCESS
+ - What Terminate does:
+    - Set Exit Code to -1
+    - Set State to TERMINATED
+    - call SCHEDULER_DELETE_PROCESS
+ - What SCHEDULER_DELETE_PROCESS does:
+    - Clear Processes Stack and all its Heap, set Stack-base and Stack pointer to 0
+    - Terminate all Childrends (Iterativ, not recursive!)
+    - Check if any Process Output-Waits for this Process
+        - Set its WAITING-DATA to Zero (was the PID of the process it wants to send to before)
+    - Check if Parent is Wainting for this Process
+        - If Parent isn't Kernel and its Wainting for Child:
+            - Copy Exit-Code into Waiting-Data
+            - Set State to READY
+            - Remove and delete PCB
+        - If Parent is Kernel:
+            - Remove and delete PCB
+        - if no one is waiting:
+            - Do nothing. As soon as WAIT gets called from Parent, remove and delete PCB
 
  ### YIELD
   - Is a callable Function without any Arguments
