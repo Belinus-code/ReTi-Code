@@ -238,6 +238,8 @@ YIELD_LOOP:
     # Input available. Wake up process
     LOADI PCB_STATE_READY
     STOREIN 1 PCB_STATE
+    LOADI 0
+    STOREIN 1 PCB_WAIT_REASON
 
 YIELD_NOWAIT:
     LOADIN 1 PCB_STATE
@@ -275,16 +277,270 @@ YIELD_LOOK_NEXT:
     STORE 1
     JUMP YIELD_LOOP
 
+
 SCHEDULER_DELETE_PROCESS:
     LOAD 1000
-    STORE 3                     # Store current PID
+    STORE 1                     # Store current PID
     LOADI 1
     STORE 1000                  # Switch to Kernel-Mode
-
     LOADIN 1 0
-    STORE 2                     # PCB to remove
+    STORE 2                     # PCP to delete
+
+    # Clear Stack and Heap
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SCHEDULER_CLEAR_PROCESS
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
 
     LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_PID
+    STORE 3
+
+SCHEDULER_DELETE_PROCESS_CL:
+    # Look up every Child and force-terminate it
+    LOAD 3
+    STORE 1030
+    LOADI PCB_PARENT_PID
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_GET_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    JUMPC = SCHEDULER_DELETE_PROCESS_CD
+    
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SCHEDULER_DELETE_PROCESS_FORCE
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    JUMP SCHEDULER_DELETE_PROCESS_CL
+
+SCHEDULER_DELETE_PROCESS_CD:
+    # Wake Output-Waiting Processes
+    LOAD 3
+    STORE 1030
+    LOADI 1
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_WAKE_SENDERS
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    # Check if Parent is Waiting
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_PARENT_PID
+    STORE 1030
+    # If Parent is Kernel, directly delete PCB
+    SUBI 1
+    JUMPC = SCHEDULER_DELETE_PROCESS_PK
+    LOADI PCB_PID
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_GET_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOAD 1030
+    STORE 4                     # 4 holds PCB of Parent
+    MOVE ACC IN1
+    LOADIN 1 PCB_STATE
+    SUBI PCB_STATE_WAITING
+    JUMPC != SCHEDULER_DELETE_PROCESS_SP
+    LOADIN 1 PCB_WAIT_REASON
+    SUBI PCB_WAITING_CHILD
+    JUMPC != SCHEDULER_DELETE_PROCESS_SP
+    LOADIN 1 PCB_WAIT_DATA
+    SUB 3
+    JUMPC != SCHEDULER_DELETE_PROCESS_SP
+
+    # Parent is waiting on this Process!
+    # Wakeup Parent
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_EXIT_CODE
+    STORE 5
+    LOAD 4
+    MOVE ACC IN1
+    LOAD 5
+    STOREIN 1 PCB_WAIT_DATA
+    LOADI 0
+    STOREIN 1 PCB_WAIT_REASON
+    LOADI PCB_STATE_READY
+    STOREIN 1 PCB_STATE
+
+SCHEDULER_DELETE_PROCESS_PK:
+    # Remove PCB
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SCHEDULER_REMOVE_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    JUMP SCHEDULER_DELETE_PROCESS_D
+
+SCHEDULER_DELETE_PROCESS_SP:
+
+SCHEDULER_DELETE_PROCESS_D:
+    LOAD 1
+    STORE 1000
+    JUMP RETURN
+
+##### SCHEDULER_DELETE_PROCESS_FORCE:
+# Force is used to imideatly kill and delete a Process and its Childrends. No Handling of Exit-Code
+    LOADIN 1 0
+    STORE 1             # Root PCB to delete
+    STORE 2             # v
+SCHEDULER_DELETE_PROCESS_FORCE_L:
+    # Get any Children Process
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_PID
+    STORE 1030
+    LOADI PCB_PARENT_PID
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_GET_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030           # PCB that has this PID as its Parent
+    STORE 3             # c
+    JUMPC = SCHEDULER_DELETE_PROCESS_FORCE_NN
+
+    LOAD 3
+    STORE 2
+    JUMP SCHEDULER_DELETE_PROCESS_FORCE_L
+
+SCHEDULER_DELETE_PROCESS_FORCE_NN:
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_PARENT_PID
+    STORE 1030
+    LOADI PCB_PID
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_GET_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    STORE 4
+
+    # Wake up every sender to this process and cause Error
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_PID
+    STORE 1030
+    LOADI 1
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_WAKE_SENDERS
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    # Clear Process
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SCHEDULER_CLEAR_PROCESS
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    # Remove PCB
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SCHEDULER_REMOVE_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    # Check if this PCB was Root
+    LOAD 2
+    SUB 1
+    JUMPC = RETURN 
+
+    # Go Back to Parent
+    LOAD 4
+    STORE 2
+    JUMP SCHEDULER_DELETE_PROCESS_FORCE_L
+
+
+SCHEDULER_CLEAR_PROCESS:
+# Frees the Stack and Heap of a PCB. Only Call in Kernel Mode!
+    LOADIN 1 0
+    STORE 1             # PCB
+
+    # Free terminated Stack
+    LOAD 1
+    JUMPC = SCHEDULER_CLEAR_PROCESS_SZ
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_BASE
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *FREE
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+SCHEDULER_CLEAR_PROCESS_SZ:
+    LOADIN 1 PCB_PID
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *FREE_PID
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOADI 0
+    STOREIN 1 PCB_STACK_BASE
+    STOREIN 1 PCB_STACK_POINTER
+    JUMP RETURN
+
+SCHEDULER_REMOVE_PCB:
+    LOADIN 1 0
+    STORE 1
+
+    # Remove PCB out of Linked List
     MOVE ACC IN1
     LOADIN 1 PCB_PID
     STORE 7
@@ -300,21 +556,8 @@ SCHEDULER_DELETE_PROCESS:
     LOAD 5
     STOREIN 1 PCB_PREV
 
-    # Free terminated Stack
-    LOAD 2
-    MOVE ACC IN1
-    LOADIN 1 PCB_STACK_BASE
-    STORE 1030
-    LOADI 1
-    STORE 1026
-    LOADI *FREE
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP CALL
-
     # Free terminated PCB
-    LOAD 2
+    LOAD 1
     STORE 1030
     LOADI 1
     STORE 1026
@@ -323,36 +566,27 @@ SCHEDULER_DELETE_PROCESS:
     MOVE PC ACC
     STORE 1025
     JUMP CALL
-
-    # Free Heap of terminated Process
-    LOAD 7
-    STORE 1030
-    LOADI 1
-    STORE 1026
-    LOADI *FREE_PID
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP CALL
-
-    LOAD 1002
-    SUBI 1
-    STORE 1002
-
-    LOAD 3
-    STORE 1000
     JUMP RETURN
 
-##### SCHEDULER_GET_PCB #####
+##### SCHEDULER_GET_PCB: #####
 SCHEDULER_GET_PCB:
     LOADIN 1 0
-    STORE 1             # PID
+    STORE 1             # Value to look for
+    LOADIN 1 1
+    STORE 2             # Index where to find the Value
     LOAD 1003
     MOVE ACC IN1
+
 SCHEDULER_GET_PCB_L:
-    LOADIN 1 PCB_PID
+    MOVE IN1 ACC
+    STORE 3
+    ADD 2
+    MOVE ACC IN1
+    LOADIN 1 0
     SUB 1
     JUMPC = SCHEDULER_GET_PCB_D
+    LOAD 3
+    MOVE ACC IN1
     LOADIN 1 PCB_NEXT
     MOVE ACC IN1
     SUB 1003
@@ -361,16 +595,48 @@ SCHEDULER_GET_PCB_L:
 
 SCHEDULER_GET_PCB_N:
     LOADI 0
-    MOVE ACC IN1
+    STORE 3
 
 SCHEDULER_GET_PCB_D:
-    MOVE IN1 ACC
-    STORE 1
     LOAD 0
     MOVE ACC IN1
-    LOAD 1
+    LOAD 3
     STOREIN 1 0
     JUMP RETURN
+
+##### SCHEDULER_WAKE_SENDERS #####
+SCHEDULER_WAKE_SENDERS:
+    LOADIN 1 0
+    STORE 1                 # PID of Receiver. 
+    LOADIN 1 1
+    STORE 2                 # If the Receiver is/was Terminated, set this Flag to 1
+    LOAD 1003
+    MOVE ACC IN1
+SCHEDULER_WAKE_SENDERS_L:
+    LOADIN 1 PCB_NEXT
+    MOVE ACC IN1            # Goto next PCB (firs pcb is kernel, cant be waiting)
+    SUB 1003
+    JUMPC = RETURN
+    LOADIN 1 PCB_STATE
+    SUBI PCB_STATE_WAITING
+    JUMPC != SCHEDULER_WAKE_SENDERS_L
+    LOADIN 1 PCB_WAIT_REASON
+    SUBI PCB_WAITING_OUTPUT
+    JUMPC != SCHEDULER_WAKE_SENDERS_L
+    LOADIN 1 PCB_WAIT_DATA
+    SUB 1
+    JUMPC != SCHEDULER_WAKE_SENDERS_L
+
+    # This Process needs to be woken up!
+    LOADI PCB_STATE_READY
+    STOREIN 1 PCB_STATE
+    LOADI 0
+    STOREIN 1 PCB_WAIT_REASON
+    LOAD 2
+    JUMPC = SCHEDULER_WAKE_SENDERS_L
+    LOADI 0
+    STOREIN 1 PCB_WAIT_DATA
+    JUMP SCHEDULER_WAKE_SENDERS_L
 
 
 SCHEDULER_FIND_FREE_PID:

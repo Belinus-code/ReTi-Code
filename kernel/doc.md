@@ -28,7 +28,7 @@
  - STATE
     - 0: Ready (Waiting for runtime)
     - 1: Running (currently running)
-    - 2: Waiting ()
+    - 2: Waiting (If State is != Waiting, WAIT-REASON must be zero)
     - 3: Terminated (Process is closed, PCB wants to be cleared)
  - WAIT-REASON
     - 0: No Reason (In this Case, STATE cannot be Waiting)
@@ -59,14 +59,6 @@
  - Every Process can read it's own PCB to use its data. However, it is only allowed to Manipulate STATE, WAIT-REASON and WAIT-DATA.
  - PCBs are aranged in a double linked list (next & previous). The List is ordered by the PIDs of the PCBs, starting at 1 (kernel) going up to the biggest
 
- ### CREATE_TASK
- - Takes absolute Entry Point and Parent PID as Arguments
- - Followed by that comes Amount of Process Arguments
- - Place any Process-Arguments, then call.
- - Parent PID can be PID of Callee or PID of Kernel
- - PID gets automatically asigned by looking for smallest available PID
- - Returns the new PID once Task is created
-
  ### Creating a Task
  - First check if the desired Parent PID is valid (either current PID or Kernel)
  - The smallest available PID gets looked up in the PCB Chain
@@ -90,12 +82,13 @@
     - call SCHEDULER_DELETE_PROCESS
  - What SCHEDULER_DELETE_PROCESS does:
     - Clear Processes Stack and all its Heap, set Stack-base and Stack pointer to 0
-    - Terminate all Childrends (Iterativ, not recursive!)
+    - Terminate all Childrends and their Childrens (Iterativ, not recursive!)
         - Delete them completey. Exit Code not needed because Parent is already Terminated
     - Check if any Process Output-Waits for this Process
         - Set its WAITING-DATA to Zero (was the PID of the process it wants to send to before)
+        - Wake the Process
     - Check if Parent is Wainting for this Process
-        - If Parent isn't Kernel and its Wainting for Child:
+        - If Parent isn't Kernel and its Wainting for this Child:
             - Copy Exit-Code into Waiting-Data
             - Set State to READY
             - Remove and delete PCB
@@ -119,6 +112,15 @@
     - Free old stack and PCB
   - Return to new Process
   - For now there is no rescue from a deadlock
+
+ ### CREATE_TASK
+ - Arg Count: 3 + Amount of Process Arguments
+ - Arg 1: PID of Parent
+ - Arg 2: Absolute Adress of Task Entry Point
+ - Arg 3: n Amount of Process Arguments (Zero if none)
+ - Arg 4 - 4+n: Process Arguments 
+ - Parent PID can be PID of Callee or PID of Kernel, otherwise Exception
+ - Returns the new PID once Task is created
 
 
 ## Stack
