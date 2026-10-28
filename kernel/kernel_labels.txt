@@ -487,4 +487,54 @@ TERMINATE_ALLOWED:
 
 ##### SHUTDOWN #####
 SHUTDOWN:
-    JUMP 0
+    # Terminate every Child (so every other Task than this)
+    # Than Exit this Task. YIELD will then Shutdown System.
+    LOAD 1000
+    SUBI 1
+    JUMPC = SHUTDOWN_KERNEL
+    
+    # Switch to Kernel Stack because any other Stacks will be terminated
+    LOADI 1
+    STORE 1000
+    LOAD 1003
+    STORE 1001
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_POINTER
+    MOVE ACC IN2
+SHUTDOWN_KERNEL:
+    LOADI 2
+    STORE 1026
+    LOADI 1                 # Search for Kernel
+    STORE 1030
+    LOADI PCB_PARENT_PID    # as Parent PID
+    STORE 1031
+    LOADI *SCHEDULER_GET_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    JUMPC = SHUTDOWN_DONE
+    STORE 1
+    MOVE ACC IN1
+    LOADIN 1 PCB_PID
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *TERMINATE
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    JUMP SHUTDOWN_KERNEL
+
+SHUTDOWN_DONE:
+    LOADI 0
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *EXIT
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL

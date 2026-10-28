@@ -142,12 +142,12 @@
   - If current Process is STATE_RUNNING, its set to STATE_READY
   - Otherwise it stays untouched, for example if its wainting or terminated
   - Stores Stack Pointer on PCB
-    - Checks for Stack-Overflow! #TODO
+    - Checks for Stack-Overflow!
   - Looks for next Ready Process
   - Loads Stackpointer from next Process
   - If old Process Terminated:
     - Switch to kernel Mode
-    - Switch to kernel Stack #TODO
+    - Switch to kernel Stack
     - Remove old PCB out of linked List
     - Free old stack and PCB
   - Return to new Process
@@ -193,6 +193,12 @@
  - Takes the Mail out of the own Mailbox, so the Mailbox is free for the next Message
  - Return Value 1: The Message (only valid if Return Value 2 is not zero)
  - Return Value 2: PID of the Sender of the Message. Zero if there was no Mail (only possible with Block-Flag zero)
+
+ ### SHUTDOWN
+ - No Arguments
+ - Terminates all Childrens of Kernel (and thus their Children)
+ - Exits Kernel
+ - Exiting Kernel will shutdown Emulator
 
 
 ## Stack
