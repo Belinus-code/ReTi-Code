@@ -63,6 +63,8 @@ SCHEDULER_SETUP:
     STOREIN 1 PCB_STACK_POINTER     # Current Stack pointer (refresh on Process switch!)
     LOADI 2048
     STOREIN 1 PCB_STACK_BASE        # Stack Base
+    LOADI 2047                      # Kernel-Stack 2048 - 4094
+    STOREIN 1 PCB_STACKSIZE
 
     LOAD 1003                   # Kernel PCB
     STORE 1030
@@ -194,6 +196,18 @@ YIELD:
     MOVE ACC IN1
     MOVE IN2 ACC
     STOREIN 1 PCB_STACK_POINTER
+
+    # Check Stack for Overflow
+    STORE 10
+    LOADIN 1 PCB_STACK_BASE
+    STORE 11
+    LOAD 10
+    SUB 11
+    STORE 10                    # Holds Amount of filled Stack Cells
+    LOADIN 1 PCB_STACKSIZE
+    SUB 10
+    JUMPC < EXCEPTION           # Call Exception because of Stack Overflow
+
     LOADIN 1 PCB_STATE
     SUBI PCB_STATE_RUNNING
     JUMPC != 3
@@ -203,10 +217,37 @@ YIELD:
     # Check if Procces terminated itself
     LOADIN 1 PCB_STATE
     SUBI PCB_STATE_TERMINATED
-    STORE 6                     # M(0) holds flag for Termination
+    JUMPC != YIELD_CON_AFTER_TERMINATE
 
+    # Check if Kernel is the process to Terminate
+    LOAD 2
+    SUB 1003
+    JUMPC = 0                   # <-- This is shutdown!
+
+    # Terminate old Process, need to switch to Kernel Stack before
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 PCB_STACK_POINTER
+    MOVE ACC IN2
+
+    # Now call SCHEDULER_CLEAR_PROCESS
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SCHEDULER_DELETE_PROCESS
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    # Done, now continue Search starting at Kernel, because old PCB might already be deleted
+    LOAD 1003
+    STORE 2
+
+YIELD_CON_AFTER_TERMINATE:
     # Now goto next Process
-    LOAD 1001
+    LOAD 2
     MOVE ACC IN1
     LOADIN 1 PCB_NEXT
     STORE 1                     # Pointer to PCB
@@ -254,28 +295,293 @@ YIELD_NOWAIT:
     LOADIN 1 PCB_STACK_POINTER
     MOVE ACC IN2
 
-    # Before Jumping back to process, check if old Process terminated
-    LOAD 6
-    JUMPC != RETURN
-    # Old Process is to be terminated. If this Process is Kernel, shutdown.
-    LOAD 2
-    SUB 1003
-    JUMPC = 0                   # this is Shutdown!!!!
-    LOAD 2
-    STORE 1030
-    LOADI 1
-    STORE 1026
-    LOADI *SCHEDULER_DELETE_PROCESS
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP CALL
     JUMP RETURN
 
 YIELD_LOOK_NEXT:
     LOADIN 1 PCB_NEXT
     STORE 1
     JUMP YIELD_LOOP
+
+##### WAIT #####
+WAIT:
+    LOADIN 1 0
+    STORE 1                     # PID of Child
+
+    # Catch Wait for itself
+    LOAD 1
+    SUB 1000
+    JUMPC = WAIT_RETURN_ERROR
+    
+    # Get PCB
+    LOAD 1
+    STORE 1030
+    LOADI PCB_PID
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_GET_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    STORE 2
+
+    JUMPC = WAIT_RETURN_ERROR
+    LOAD 1000
+    SUBI 1
+    JUMPC = WAIT_ALLOWED
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_PARENT_PID
+    SUB 1000
+    JUMPC != WAIT_RETURN_ERROR
+WAIT_ALLOWED:
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 PCB_STATE
+    SUBI PCB_STATE_TERMINATED
+    JUMPC != WAIT_GO_SLEEP
+    LOADIN 1 PCB_EXIT_CODE
+    STORE 3                     # 3 holds Exit Code
+
+    # Remove PCB
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SCHEDULER_REMOVE_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 3
+    STOREIN 1 0
+    LOADI 0
+    STOREIN 1 1
+    JUMP RETURN
+
+WAIT_GO_SLEEP:
+    # Set State to Waiting for Child
+    LOAD 1001
+    MOVE ACC IN1
+    LOADI PCB_STATE_WAITING
+    STOREIN 1 PCB_STATE
+    LOADI PCB_WAITING_CHILD
+    STOREIN 1 PCB_WAIT_REASON
+    LOAD 1
+    STOREIN 1 PCB_WAIT_DATA
+
+    # Yield
+    LOADI 0
+    STORE 1026
+    LOADI *YIELD
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOADIN 1 PCB_WAIT_DATA
+    STORE 3
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 3
+    STOREIN 1 0
+    LOADI 0
+    STOREIN 1 1
+    JUMP RETURN
+
+
+WAIT_RETURN_ERROR:
+    LOAD 0
+    MOVE ACC IN1
+    LOADI 1
+    STOREIN 1 1                 # Mark that Child does not exist or Child is itself
+    JUMP RETURN
+
+##### SEND #####
+SEND:
+    LOADIN 1 0
+    STORE 1                     # PID of Receiver
+    LOADIN 1 1
+    STORE 2                     # Message
+    LOADIN 1 2
+    STORE 4                     # If 0, dont go to sleep
+    LOADI SEND_OKAY
+    STORE 5                     # Error Flag
+
+    # Catch Send to itself
+    LOAD 1
+    SUB 1000
+    JUMPC != SEND_CON
+    LOADI SEND_TOSELF
+    STOREIN 1 0
+    JUMP RETURN
+
+SEND_CON:
+    # Get PCB
+    LOAD 1
+    STORE 1030
+    LOADI PCB_PID
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_GET_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    STORE 3
+
+    # Check if Mailbox is empty
+    JUMPC != 4
+    LOADI SEND_NO_REC
+    STORE 5
+    JUMP SEND_RETURN
+    MOVE ACC IN1
+    LOADIN 1 PCB_STATE
+    SUBI PCB_STATE_TERMINATED
+    JUMPC != 4
+    LOADI SEND_REC_TERM
+    STORE 5
+    JUMP SEND_RETURN
+    LOADIN 1 PCB_MAILSENDER
+    JUMPC != SEND_MAILFULL
+
+    # Store Mail
+    LOAD 1000                   # Own PID
+    STOREIN 1 PCB_MAILSENDER
+    LOAD 2
+    STOREIN 1 PCB_MAILBOX
+
+    # Check if Receiver is waiting for Mail, wake up if so
+    LOADIN 1 PCB_STATE
+    SUBI PCB_STATE_WAITING
+    JUMPC != SEND_SUCCES
+    LOADIN 1 PCB_WAIT_REASON
+    SUBI PCB_WAITING_MAIL
+    JUMPC != SEND_SUCCES
+    
+    LOADI PCB_STATE_READY
+    STOREIN 1 PCB_STATE
+    LOADI 0
+    STOREIN 1 PCB_WAIT_REASON
+    JUMP SEND_SUCCES
+
+SEND_MAILFULL:
+    LOAD 4
+    JUMPC != 4
+    LOADI SEND_REC_FULL
+    STORE 5
+    JUMP SEND_RETURN
+    LOAD 1001
+    MOVE ACC IN1
+    LOADI PCB_STATE_WAITING
+    STOREIN 1 PCB_STATE
+    LOADI PCB_WAITING_OUTPUT
+    STOREIN 1 PCB_WAIT_REASON
+    LOAD 1
+    STOREIN 1 PCB_WAIT_DATA
+
+    # Yield
+    LOADI 0
+    STORE 1026
+    LOADI *YIELD
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOADIN 1 PCB_WAIT_DATA
+    JUMPC != 4
+    LOADI SEND_REC_TERM
+    STORE 5
+    JUMP SEND_RETURN
+    LOAD 0
+    MOVE ACC IN1
+    JUMP SEND
+
+SEND_SUCCES:
+    LOADI SEND_OKAY
+    STORE 5
+SEND_RETURN:
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 5
+    STOREIN 1 0
+    JUMP RETURN
+
+##### RECEIVE #####
+RECEIVE:
+    LOADIN 1 0
+    STORE 1                     # If 0, dont go to sleep
+
+    LOAD 1001
+    MOVE ACC IN1
+    LOADIN 1 PCB_MAILSENDER
+    JUMPC = RECEIVE_SLEEP
+
+    # Read Message
+    LOADIN 1 PCB_MAILBOX
+    STORE 2
+    LOADIN 1 PCB_MAILSENDER
+    STORE 3
+    LOADI 0
+    STOREIN 1 PCB_MAILSENDER
+
+    LOAD 1000
+    STORE 1030
+    LOADI 0
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_WAKE_SENDERS
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOAD 0
+    MOVE ACC IN1
+    LOAD 2
+    STOREIN 1 0
+    LOAD 3
+    STOREIN 1 1
+    JUMP RETURN
+RECEIVE_SLEEP:
+    LOAD 1
+    JUMPC = RECEIVE_ABORT
+    LOAD 1001
+    MOVE ACC IN1
+    LOADI PCB_STATE_WAITING
+    STOREIN 1 PCB_STATE
+    LOADI PCB_WAITING_MAIL
+    STOREIN 1 PCB_WAIT_REASON
+
+    # Yield
+    LOADI 0
+    STORE 1026
+    LOADI *YIELD
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+    LOAD 0
+    MOVE ACC IN1
+    JUMP RECEIVE
+
+RECEIVE_ABORT:
+    LOAD 0
+    MOVE ACC IN1
+    LOADI 0
+    STOREIN 1 0
+    STOREIN 1 1
+    JUMP RETURN
 
 
 SCHEDULER_DELETE_PROCESS:
@@ -408,7 +714,8 @@ SCHEDULER_DELETE_PROCESS_D:
     STORE 1000
     JUMP RETURN
 
-##### SCHEDULER_DELETE_PROCESS_FORCE:
+##### SCHEDULER_DELETE_PROCESS_FORCE #####
+SCHEDULER_DELETE_PROCESS_FORCE:
 # Force is used to imideatly kill and delete a Process and its Childrends. No Handling of Exit-Code
     LOADIN 1 0
     STORE 1             # Root PCB to delete
@@ -534,6 +841,7 @@ SCHEDULER_CLEAR_PROCESS_SZ:
     LOADI 0
     STOREIN 1 PCB_STACK_BASE
     STOREIN 1 PCB_STACK_POINTER
+    STOREIN 1 PCB_STACKSIZE
     JUMP RETURN
 
 SCHEDULER_REMOVE_PCB:

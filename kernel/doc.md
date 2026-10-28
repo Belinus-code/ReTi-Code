@@ -72,11 +72,14 @@
  ### Terminating a Task
  - Terminating or Exiting a Task is complicated and descriped here. This is not a Method-Description!
  - What Exit does:
+    - Exit can only be called by the Process itself!
     - Set Exit Code 
     - Set State to TERMINATED
     - Call YIELD
         - YIELD will then automatically call SCHEDULER_DELETE_PROCESS
  - What Terminate does:
+    - Terminate can only be called by Kernel or Parent
+    - A Process can't terminate itself
     - Set Exit Code to -1
     - Set State to TERMINATED
     - call SCHEDULER_DELETE_PROCESS
@@ -96,6 +99,43 @@
             - Remove and delete PCB
         - if no one is waiting:
             - Do nothing. As soon as WAIT gets called from Parent, remove and delete PCB
+
+ ### Waiting for a Task
+  - Get Child PCB. Return 1 if Child does not exist
+  - Check STATE of Child:
+    - Terminated:
+        - Load Exit Code
+        - remove PCB of Child
+        - Return Code
+    - Not Terminated:
+        - Set State to Waiting for Child
+        - Set Child pid to Data
+        - Call YIELD
+        - Get Exit Code out of WAITING-DATA
+        - return Exit Code
+
+ ### Sending a Message to a Process
+  - Get Receiver PCB. Return 1 if Receiver does not exist
+  - Check Mailbox of Receiver:
+    - Free:
+        - Save Mailbox and Mailsender
+        - If Receiver is waiting for Mail, wake up
+    - Full:
+        - Set own State to Waiting for Output
+        - Yield
+        - Check if Waiting-Data is zero, if so Return 2 (Receiver terminated)
+        - Else, restart Sending a Message
+
+ ### Receiving a Message from a Process
+  - Check own Mailsender
+    - Mailsender != 0
+        - Read Message and sender
+        - Call SCHEDULER_WAKE_SENDERS
+        - Return Message and Sender
+    - Mailsender = 0
+        - Set State to Waiting for Mail
+        - Call Yield
+        - Restart receiving a Message
 
  ### YIELD
   - Is a callable Function without any Arguments
@@ -121,6 +161,38 @@
  - Arg 4 - 4+n: Process Arguments 
  - Parent PID can be PID of Callee or PID of Kernel, otherwise Exception
  - Returns the new PID once Task is created
+
+ ### WAIT
+ - Arg Count: 2
+ - Arg 1: PID of the Child-Process to wait for
+ - Arg 2: Unused, only for Return
+ - Only the Parent of the Child (or the Kernel) can wait for a Process
+ - Blocks the calling Process until the Child has terminated. If the Child is already terminated, returns immediately
+ - Removes the PCB of the Child, its PID is free for new Processes afterwards
+ - Return Value 1: Exit-Code of the Child (-1 if the Child got terminated by TERMINATE). Only valid if Return Value 2 is zero
+ - Return Value 2: Error Flag. 0: Success. 1: Error (Child does not exist, caller is not the Parent of the Child or Child is the caller itself)
+
+ ### SEND
+ - Arg Count: 3
+ - Arg 1: PID of the Receiver
+ - Arg 2: Message
+ - Arg 3: Block-Flag. 0: Do not block if the Mailbox of the Receiver is full. Otherwise: Block until the Message could be delivered
+ - Every Process can send a Mail to every other living Process, except to itself
+ - Receiver gets the Message together with the PID of the Sender
+ - Return Value 1: Status
+    - 0 (SEND_OKAY): Message was delivered
+    - 1 (SEND_NO_REC): Receiver does not exist
+    - 2 (SEND_REC_TERM): Receiver is terminated (or terminated while the Sender was blocked), Message was not delivered
+    - 3 (SEND_REC_FULL): Mailbox of Receiver is full and Block-Flag was zero, Message was not delivered
+    - 4 (SEND_TOSELF): Receiver is the caller itself, Message was not delivered
+
+ ### RECEIVE
+ - Arg Count: 2
+ - Arg 1: Block-Flag. 0: Do not block if there is no Mail. Otherwise: Block until a Mail arrives
+ - Arg 2: Unused, only for Return
+ - Takes the Mail out of the own Mailbox, so the Mailbox is free for the next Message
+ - Return Value 1: The Message (only valid if Return Value 2 is not zero)
+ - Return Value 2: PID of the Sender of the Message. Zero if there was no Mail (only possible with Block-Flag zero)
 
 
 ## Stack

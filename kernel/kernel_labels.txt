@@ -260,7 +260,7 @@ KERNEL_CREATE_PCB:
     STOREIN 1 PCB_MAILSENDER
 
     # Allocate Heap for Stack
-    LOADI 256
+    LOADI DEFAULT_PROCESS_STACKSIZE
     STORE 1030
     LOADI 1
     STORE 1026
@@ -272,6 +272,8 @@ KERNEL_CREATE_PCB:
     LOAD 1030
     STOREIN 1 PCB_STACK_BASE
     STOREIN 1 PCB_STACK_POINTER
+    LOADI DEFAULT_PROCESS_STACKSIZE
+    STOREIN 1 PCB_STACKSIZE
 
     LOAD 0
     MOVE ACC IN1
@@ -399,6 +401,88 @@ CREATE_TASK_CAD:
     MOVE ACC IN1
     LOAD 2              # New PID
     STOREIN 1 0
+    JUMP RETURN
+
+##### EXIT #####
+EXIT:
+    LOADIN 1 0
+    STORE 1             # Exit-Code
+    LOAD 1001           # Current PCB
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 PCB_EXIT_CODE
+    LOADI PCB_STATE_TERMINATED
+    STOREIN 1 PCB_STATE
+
+    # Call YIELD
+    LOADI 0
+    STORE 1026
+    LOADI *YIELD
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+
+##### TERMINATE #####
+TERMINATE:
+    LOAD 1000
+    STORE 1             # PID of Caller
+    LOADIN 1 0
+    STORE 2             # PID of Process to Terminate
+    SUB 1
+    JUMPC = RETURN      # Cannot Terminate itself
+    LOAD 2
+    SUBI 1
+    JUMPC = RETURN      # Cannot Terminate Kernel (only Exit allowed -> Shutdown)
+
+    # Get PCB of Process to Terminate
+    LOAD 2
+    STORE 1030
+    LOADI PCB_PID
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI *SCHEDULER_GET_PCB
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
+    LOAD 1030
+    JUMPC = RETURN      # If PCB is Zero, Process does not exist
+    STORE 3
+    MOVE ACC IN1
+
+    LOADIN 1 PCB_STATE
+    SUBI PCB_STATE_TERMINATED
+    JUMPC = RETURN              # If Process is already Terminated, no need to terminate
+
+    # Check if Parent is Kernel
+    LOAD 1
+    SUBI 1
+    JUMPC = TERMINATE_ALLOWED   # Kernel can Terminate every Process
+
+    LOADIN 1 PCB_PARENT_PID
+    SUB 1
+    JUMPC != RETURN
+    
+TERMINATE_ALLOWED:
+    # Termination is allowed
+    LOAD 3
+    MOVE ACC IN1
+    LOADI -1
+    STOREIN 1 PCB_EXIT_CODE
+    LOADI PCB_STATE_TERMINATED
+    STOREIN 1 PCB_STATE
+
+    LOAD 3
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI *SCHEDULER_DELETE_PROCESS
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP CALL
     JUMP RETURN
 
 ##### SHUTDOWN #####

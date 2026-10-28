@@ -2,8 +2,9 @@
 
 
 
-JUMP 424          
-JUMP 1033       
+
+JUMP 651          
+JUMP 1260       
 
 # --- SETUP ---
 LOADI 4095
@@ -20,25 +21,25 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 452    
+    LOADI 679    
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 302 
+    JUMP 529 
     LOAD 1030               # <-- Boot-Stack Pointer
     STORE 1004
     MOVE ACC IN2
 
     # Create Process-Controll-Block for Kernel
-    LOADI 12
+    LOADI 13
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 440    
+    LOADI 667    
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 290 
+    JUMP 517 
 
     # Fill PCB with Kernel-Data
     LOAD 1030
@@ -66,10 +67,12 @@ STORE 4095             # Initialisiere leeren Heap
     STOREIN 1 6     # Current Stack pointer (refresh on Process switch!)
     LOADI 2048
     STOREIN 1 7        # Stack Base
+    LOADI 2047                      # Kernel-Stack 2048 - 4094
+    STOREIN 1 12
 
     LOAD 1003                   # Kernel PCB
     STORE 1030
-    LOADI 1111                  # Relative Offset to Kernel-Entry
+    LOADI 1336                  # Relative Offset to Kernel-Entry
     STORE 1
     MOVE PC ACC                 # Current Adress
     STORE 2
@@ -85,7 +88,7 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 246 
+    JUMP 471 
 
     # Switch to Kernel Stack
     LOAD 1001
@@ -98,16 +101,16 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 472  
+    LOADI 697  
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 233 
+    JUMP 458 
     LOADI 0
     STORE 1004
 
     # Call Return and hope for the best
-    JUMP 285                    # Due to manipulated Kernel stack, this should take execution to KERNEL_ENTRY
+    JUMP 510                    # Due to manipulated Kernel stack, this should take execution to KERNEL_ENTRY
 
 
     LOADIN 1 0                  # Pointer to PCB
@@ -184,7 +187,7 @@ STORE 4095             # Initialisiere leeren Heap
     MOVE ACC IN1
     LOAD 4
     STOREIN 1 6
-    JUMP 222   
+    JUMP 447   
 
 
 
@@ -193,6 +196,18 @@ STORE 4095             # Initialisiere leeren Heap
     MOVE ACC IN1
     MOVE IN2 ACC
     STOREIN 1 6
+
+    # Check Stack for Overflow
+    STORE 10
+    LOADIN 1 7
+    STORE 11
+    LOAD 10
+    SUB 11
+    STORE 10                    # Holds Amount of filled Stack Cells
+    LOADIN 1 12
+    SUB 10
+    JUMPC < 1038                # Call Exception because of Stack Overflow
+
     LOADIN 1 3
     SUBI 1
     JUMPC != 3
@@ -202,10 +217,36 @@ STORE 4095             # Initialisiere leeren Heap
     # Check if Procces terminated itself
     LOADIN 1 3
     SUBI 3
-    STORE 6                     # M(0) holds flag for Termination
+    JUMPC != 19                       
+
+    # Check if Kernel is the process to Terminate
+    LOAD 2
+    SUB 1003
+    JUMPC = 0                   # <-- This is shutdown!
+
+    # Terminate old Process, need to switch to Kernel Stack before
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 6
+    MOVE ACC IN2
+
+    # Now call SCHEDULER_CLEAR_PROCESS
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 50                       
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 354 
+
+    # Done, now continue Search starting at Kernel, because old PCB might already be deleted
+    LOAD 1003
+    STORE 2
 
     # Now goto next Process
-    LOAD 1001
+    LOAD 2
     MOVE ACC IN1
     LOADIN 1 0
     STORE 1                     # Pointer to PCB
@@ -215,11 +256,11 @@ STORE 4095             # Initialisiere leeren Heap
     
     # Check if State is Waiting
     SUBI 2
-    JUMPC != 18          
+    JUMPC != 20          
     # Check if reason is Input
     LOADIN 1 4
     SUBI 1
-    JUMPC != 15          
+    JUMPC != 17          
     # Process is waiting for input. Check if Input exists
     MOVE IN1 ACC
     STORE 3
@@ -232,14 +273,16 @@ STORE 4095             # Initialisiere leeren Heap
     LOAD 3
     MOVE ACC IN1                # Reset Pointer to PCB
     LOAD 4
-    JUMPC = 3           
+    JUMPC = 5           
     # Input available. Wake up process
     LOADI 0
     STOREIN 1 3
+    LOADI 0
+    STOREIN 1 4
 
     LOADIN 1 3
     SUBI 0
-    JUMPC != 24             
+    JUMPC != 10             
     LOAD 1
     STORE 1001                  # Update PCB Pointer
     LOADIN 1 2
@@ -249,37 +292,266 @@ STORE 4095             # Initialisiere leeren Heap
     LOADIN 1 6
     MOVE ACC IN2
 
-    # Before Jumping back to process, check if old Process terminated
-    LOAD 6
-    JUMPC != 170   
-    # Old Process is to be terminated. If this Process is Kernel, shutdown.
-    LOAD 2
-    SUB 1003
-    JUMPC = 0                   # this is Shutdown!!!!
+    JUMP 367   
+
+    LOADIN 1 0
+    STORE 1
+    JUMP -38       
+
+
+    LOAD 1000
+    STORE 1                     # Store current PID
+    LOADI 1
+    STORE 1000                  # Switch to Kernel-Mode
+    LOADIN 1 0
+    STORE 2                     # PCP to delete
+
+    # Clear Stack and Heap
     LOAD 2
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 9                        
+    LOADI 168                     
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 103 
-    JUMP 157   
+    JUMP 294 
+
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 2
+    STORE 3
+
+    # Look up every Child and force-terminate it
+    LOAD 3
+    STORE 1030
+    LOADI 8
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI 206               
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 279 
+    LOAD 1030
+    JUMPC = 10                         
+    
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 69                             
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 269 
+    JUMP -21                        
+
+    # Wake Output-Waiting Processes
+    LOAD 3
+    STORE 1030
+    LOADI 1
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI 211                    
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 257 
+
+    # Check if Parent is Waiting
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 8
+    STORE 1030
+    # If Parent is Kernel, directly delete PCB
+    SUBI 1
+    JUMPC = 34                         
+    LOADI 2
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI 169               
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 242 
+
+    LOAD 1030
+    STORE 4                     # 4 holds PCB of Parent
+    MOVE ACC IN1
+    LOADIN 1 3
+    SUBI 2
+    JUMPC != 29                         
+    LOADIN 1 4
+    SUBI 3
+    JUMPC != 26                         
+    LOADIN 1 5
+    SUB 3
+    JUMPC != 23                         
+
+    # Parent is waiting on this Process!
+    # Wakeup Parent
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 9
+    STORE 5
+    LOAD 4
+    MOVE ACC IN1
+    LOAD 5
+    STOREIN 1 5
+    LOADI 0
+    STOREIN 1 4
+    LOADI 0
+    STOREIN 1 3
+
+    # Remove PCB
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 111                  
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 209 
+    JUMP 1                         
+
+
+    LOAD 1
+    STORE 1000
+    JUMP 260   
+
+##### SCHEDULER_DELETE_PROCESS_FORCE #####
+# Force is used to imideatly kill and delete a Process and its Childrends. No Handling of Exit-Code
+    LOADIN 1 0
+    STORE 1             # Root PCB to delete
+    STORE 2             # v
+    # Get any Children Process
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 2
+    STORE 1030
+    LOADI 8
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI 116               
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 189 
+    LOAD 1030           # PCB that has this PID as its Parent
+    STORE 3             # c
+    JUMPC = 4                                
+
+    LOAD 3
+    STORE 2
+    JUMP -18                             
+
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 8
+    STORE 1030
+    LOADI 2
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI 97                
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 170 
+    LOAD 1030
+    STORE 4
+
+    # Wake up every sender to this process and cause Error
+    LOAD 2
+    MOVE ACC IN1
+    LOADIN 1 2
+    STORE 1030
+    LOADI 1
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI 109                    
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 155 
+
+    # Clear Process
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 20                      
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 146 
+
+    # Remove PCB
+    LOAD 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 39                   
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 137 
+
+    # Check if this PCB was Root
+    LOAD 2
+    SUB 1
+    JUMPC = 189    
+
+    # Go Back to Parent
+    LOAD 4
+    STORE 2
+    JUMP -70                             
+
+
+# Frees the Stack and Heap of a PCB. Only Call in Kernel Mode!
+    LOADIN 1 0
+    STORE 1             # PCB
+
+    # Free terminated Stack
+    LOAD 1
+    JUMPC = 11                        
+    MOVE ACC IN1
+    LOADIN 1 7
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 356  
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 117 
+
+    LOADIN 1 2
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI 648      
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP 108 
+
+    LOADI 0
+    STOREIN 1 7
+    STOREIN 1 6
+    STOREIN 1 12
+    JUMP 158   
 
     LOADIN 1 0
     STORE 1
-    JUMP -50       
 
-    LOAD 1000
-    STORE 3                     # Store current PID
-    LOADI 1
-    STORE 1000                  # Switch to Kernel-Mode
-
-    LOADIN 1 0
-    STORE 2                     # PCB to remove
-
-    LOAD 2
+    # Remove PCB out of Linked List
     MOVE ACC IN1
     LOADIN 1 2
     STORE 7
@@ -295,73 +567,81 @@ STORE 4095             # Initialisiere leeren Heap
     LOAD 5
     STOREIN 1 1
 
-    # Free terminated Stack
-    LOAD 2
-    MOVE ACC IN1
-    LOADIN 1 7
-    STORE 1030
-    LOADI 1
-    STORE 1026
-    LOADI 307  
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP 68  
-
     # Free terminated PCB
-    LOAD 2
+    LOAD 1
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI 298  
+    LOADI 318  
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP 59  
+    JUMP 79  
+    JUMP 133   
 
-    # Free Heap of terminated Process
-    LOAD 7
-    STORE 1030
-    LOADI 1
-    STORE 1026
-    LOADI 590      
-    STORE 1024
-    MOVE PC ACC
-    STORE 1025
-    JUMP 50  
-
-    LOAD 1002
-    SUBI 1
-    STORE 1002
-
-    LOAD 3
-    STORE 1000
-    JUMP 99    
-
-##### SCHEDULER_GET_PCB #####
+##### SCHEDULER_GET_PCB: #####
     LOADIN 1 0
-    STORE 1             # PID
+    STORE 1             # Value to look for
+    LOADIN 1 1
+    STORE 2             # Index where to find the Value
     LOAD 1003
     MOVE ACC IN1
-    LOADIN 1 2
+
+    MOVE IN1 ACC
+    STORE 3
+    ADD 2
+    MOVE ACC IN1
+    LOADIN 1 0
     SUB 1
-    JUMPC = 8                  
+    JUMPC = 10                 
+    LOAD 3
+    MOVE ACC IN1
     LOADIN 1 0
     MOVE ACC IN1
     SUB 1003
     JUMPC = 2                  
-    JUMP -7                 
+    JUMP -13                
 
     LOADI 0
-    MOVE ACC IN1
+    STORE 3
 
-    MOVE IN1 ACC
-    STORE 1
     LOAD 0
     MOVE ACC IN1
-    LOAD 1
+    LOAD 3
     STOREIN 1 0
-    JUMP 78    
+    JUMP 106   
+
+##### SCHEDULER_WAKE_SENDERS #####
+    LOADIN 1 0
+    STORE 1                 # PID of Receiver. 
+    LOADIN 1 1
+    STORE 2                 # If the Receiver is/was Terminated, set this Flag to 1
+    LOAD 1003
+    MOVE ACC IN1
+    LOADIN 1 0
+    MOVE ACC IN1            # Goto next PCB (firs pcb is kernel, cant be waiting)
+    SUB 1003
+    JUMPC = 96    
+    LOADIN 1 3
+    SUBI 2
+    JUMPC != -6                      
+    LOADIN 1 4
+    SUBI 2
+    JUMPC != -9                      
+    LOADIN 1 5
+    SUB 1
+    JUMPC != -12                     
+
+    # This Process needs to be woken up!
+    LOADI 0
+    STOREIN 1 3
+    LOADI 0
+    STOREIN 1 4
+    LOAD 2
+    JUMPC = -18                     
+    LOADI 0
+    STOREIN 1 5
+    JUMP -21                     
 
 
     LOAD 1003
@@ -548,7 +828,7 @@ STORE 4095             # Initialisiere leeren Heap
     STORE 8
     STORE 9
     MOVE acc IN1
-    JUMP -441 
+    JUMP -668 
 
 ###### STACK_DUMP ######
     MOVE IN2 ACC
@@ -1264,7 +1544,7 @@ SUBI 100
 STOREIN 1 0
 SUBI 127
 JUMPC < -7              
-JUMP -1042             
+JUMP -1269             
 
 ###### MIN METHOD ######
     LOADIN 1 0              # IN1 is Frame-Pointer because Call Method puts it there
@@ -1438,7 +1718,7 @@ JUMP -1042
     LOADI 1                 
     STORE 1030              # Store Parent PID
 
-    LOADI 638                # Relative Offset to Kernel-Entry
+    LOADI 704                # Relative Offset to Kernel-Entry
     STORE 1
     MOVE PC ACC                 # Current Adress
     ADD 1
@@ -1449,7 +1729,7 @@ JUMP -1042
     STORE 1032              # Amount of Process Args
     LOADI 3
     STORE 1026
-    LOADI 175         
+    LOADI 177         
     STORE 1024
     MOVE PC ACC
     STORE 1025
@@ -1469,7 +1749,7 @@ JUMP -1042
     MOVE PC ACC
     STORE 1025
     JUMP -904
-    LOADI -1071 
+    LOADI -1296 
     STORE 1024
     MOVE PC ACC
     STORE 1025
@@ -1487,7 +1767,7 @@ JUMP -1042
     JUMPC >= 28                    
     
     # Buffer isn't full. Try to read next input
-    READ KERNEL_READ_INPUT_DONE          # Jumps to Flag if there is no Input, otherwise contiues
+    READ 26                              # Jumps to Flag if there is no Input, otherwise contiues
     STORE 0                              # Key (ACC) would be lost by the LOADINs below
     LOADIN 1 0
     STORE 1
@@ -1571,7 +1851,7 @@ JUMP -1042
     STOREIN 1 4
     LOADI 0
     STORE 1026 
-    LOADI -1156 
+    LOADI -1381 
     STORE 1024
     MOVE PC ACC
     STORE 1025
@@ -1619,7 +1899,7 @@ JUMP -1042
     STORE 1             # PID
 
     # Allocate Heap for PCB
-    LOADI 12
+    LOADI 13
     STORE 1030
     LOADI 1
     STORE 1026
@@ -1656,12 +1936,14 @@ JUMP -1042
     LOAD 1030
     STOREIN 1 7
     STOREIN 1 6
+    LOADI 256
+    STOREIN 1 12
 
     LOAD 0
     MOVE ACC IN1
     LOAD 2
     STOREIN 1 0
-    JUMP -1014 
+    JUMP -1016 
 
 ##### CREATE_TASK #####
     # Can be called out of any Context!
@@ -1686,17 +1968,17 @@ JUMP -1042
     JUMPC = 4                 
     LOAD 1
     STORE 1000
-    JUMP -428     
+    JUMP -430     
 
     LOADI 1
     STORE 1026
     LOADI 0
     STORE 1030
-    LOADI -1115                   
+    LOADI -1117                   
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1097
+    JUMP -1099
     LOAD 1030
     STORE 9             # PID of new Process
 
@@ -1705,11 +1987,11 @@ JUMP -1042
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -74               
+    LOADI -76               
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1108
+    JUMP -1110
 
     LOAD 1030       
     STORE 5                 # Pointer to new PCB
@@ -1757,21 +2039,21 @@ JUMP -1042
     LOADI 3
     ADD 4
     STORE 1026
-    LOADI -1377                           
+    LOADI -1604                           
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1152
+    JUMP -1154
 
     LOAD 5
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -161              
+    LOADI -163              
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1161
+    JUMP -1163
     LOAD 1
     STORE 1000
 
@@ -1779,7 +2061,86 @@ JUMP -1042
     MOVE ACC IN1
     LOAD 2              # New PID
     STOREIN 1 0
-    JUMP -1113 
+    JUMP -1115 
+
+##### EXIT #####
+    LOADIN 1 0
+    STORE 1             # Exit-Code
+    LOAD 1001           # Current PCB
+    MOVE ACC IN1
+    LOAD 1
+    STOREIN 1 9
+    LOADI 3
+    STOREIN 1 3
+
+    # Call YIELD
+    LOADI 0
+    STORE 1026
+    LOADI -1572 
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1185
+
+##### TERMINATE #####
+    LOAD 1000
+    STORE 1             # PID of Caller
+    LOADIN 1 0
+    STORE 2             # PID of Process to Terminate
+    SUB 1
+    JUMPC = -1136       # Cannot Terminate itself
+    LOAD 2
+    SUBI 1
+    JUMPC = -1139       # Cannot Terminate Kernel (only Exit allowed -> Shutdown)
+
+    # Get PCB of Process to Terminate
+    LOAD 2
+    STORE 1030
+    LOADI 2
+    STORE 1031
+    LOADI 2
+    STORE 1026
+    LOADI -1278             
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1205
+    LOAD 1030
+    JUMPC = -1152       # If PCB is Zero, Process does not exist
+    STORE 3
+    MOVE ACC IN1
+
+    LOADIN 1 3
+    SUBI 3
+    JUMPC = -1157               # If Process is already Terminated, no need to terminate
+
+    # Check if Parent is Kernel
+    LOAD 1
+    SUBI 1
+    JUMPC = 4                   # Kernel can Terminate every Process
+
+    LOADIN 1 8
+    SUB 1
+    JUMPC != -1163 
+    
+    # Termination is allowed
+    LOAD 3
+    MOVE ACC IN1
+    LOADI -1
+    STOREIN 1 9
+    LOADI 3
+    STOREIN 1 3
+
+    LOAD 3
+    STORE 1030
+    LOADI 1
+    STORE 1026
+    LOADI -1537                    
+    STORE 1024
+    MOVE PC ACC
+    STORE 1025
+    JUMP -1233
+    JUMP -1179 
 
 ##### SHUTDOWN #####
     JUMP 0
@@ -1789,7 +2150,7 @@ JUMP -1042
     LOADIN 1 1
     STORE 2
     SUB 1
-    JUMPC = -515            # In Case both Strings are the same
+    JUMPC = -581            # In Case both Strings are the same
     LOAD 1
     STORE 1030
     LOADI 1
@@ -1798,7 +2159,7 @@ JUMP -1042
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1184
+    JUMP -1250
     LOAD 1030
     STORE 3
 
@@ -1810,7 +2171,7 @@ JUMP -1042
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1195
+    JUMP -1261
     LOAD 1030
     ADD 3
     ADDI 1              # For Zero Terminator
@@ -1820,11 +2181,11 @@ JUMP -1042
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -595   
+    LOADI -661   
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1208
+    JUMP -1274
     LOAD 1030
     SUB 3
     JUMPC >= 14                      
@@ -1835,11 +2196,11 @@ JUMP -1042
     STORE 1031
     LOADI 2
     STORE 1026
-    LOADI -893    
+    LOADI -959    
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1222
+    JUMP -1288
     LOAD 1030
     STORE 1
     LOAD 1
@@ -1852,28 +2213,28 @@ JUMP -1042
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1235
+    JUMP -1301
     # Now Free secondary Buffer
     LOAD 2
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -1005
+    LOADI -1071
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1244
+    JUMP -1310
     LOAD 0
     MOVE ACC IN1
     LOAD 1
     STOREIN 1 0
-    JUMP -1194 
+    JUMP -1260 
 
 ##### PRINT #####
     LOADIN 1 0
     MOVE ACC IN1
     LOADIN 1 0
-    JUMPC <= -1198 
+    JUMPC <= -1264 
     STORE 1
     PRINTC 1
     MOVE IN1 ACC
@@ -1899,7 +2260,7 @@ JUMP -1042
     LOAD 2
     MOVE ACC IN1
     LOADIN 1 0
-    JUMPC = -1222 
+    JUMPC = -1288 
     STORE 3
     LOAD 1
     MOVE ACC IN1
@@ -1961,10 +2322,10 @@ JUMP -1042
     LOAD 3
     STOREIN 1 0
     LOAD 4
-    JUMPC = -1279 
+    JUMPC = -1345 
     LOADI 1
     STOREIN 1 1
-    JUMP -1282 
+    JUMP -1348 
 
     LOAD 0
     MOVE ACC IN1
@@ -1972,7 +2333,7 @@ JUMP -1042
     STOREIN 1 0         # Copy Max Size as return arg
     LOADI 0
     STOREIN 1 1
-    JUMP -1289 
+    JUMP -1355 
 
 ###### ATOI METHOD ######
     LOADI 0
@@ -2015,11 +2376,11 @@ JUMP -1042
     STORE 1030              # Parse result to args
     LOADI 10                # -1 to negate
     STORE 1031              # store -1 to args
-    LOADI -638
+    LOADI -704
     STORE 1024
     MOVE pc acc
     STORE 1025
-    JUMP -1386
+    JUMP -1452
     LOAD 1030
     ADD 2
     STORE 4
@@ -2037,11 +2398,11 @@ JUMP -1042
     STORE 1030              # Parse result to args
     LOADI -1                # -1 to negate
     STORE 1031              # store -1 to args
-    LOADI -658
+    LOADI -724
     STORE 1024
     MOVE pc acc
     STORE 1025
-    JUMP -1406
+    JUMP -1472
     LOAD 1030
     STORE 4
 
@@ -2057,7 +2418,7 @@ JUMP -1042
     STOREIN 1 1
     LOAD 4
     STOREIN 1 0
-    JUMP -1366 
+    JUMP -1432 
 
 ###### ITOA METHOD ######
     LOADIN 1 0              # Integer to Convert
@@ -2117,11 +2478,11 @@ JUMP -1042
     STORE 1031
     LOADI 2
     STORE 1026
-    LOADI -692   
+    LOADI -758   
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1480
+    JUMP -1546
     LOAD 1030               # quotient
     STORE 5
     JUMPC != 3              
@@ -2165,16 +2526,16 @@ JUMP -1042
     MOVE IN2 ACC
     SUBI 11
     MOVE ACC IN2            # Update Stack Pointer 
-    JUMP -1467 
+    JUMP -1533 
     LOADI 32
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -1381  
+    LOADI -1447  
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1531
+    JUMP -1597
     LOAD 1030
     STORE 0
 
@@ -2182,11 +2543,11 @@ JUMP -1042
     STORE 1030
     LOADI 1
     STORE 1026
-    LOADI -592     
+    LOADI -658     
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1542
+    JUMP -1608
 
 
     LOAD 1030
@@ -2200,7 +2561,7 @@ JUMP -1042
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1554
+    JUMP -1620
 
     LOAD 0
     STORE 1030
@@ -2210,7 +2571,7 @@ JUMP -1042
     STORE 1024
     MOVE PC ACC
     STORE 1025
-    JUMP -1563
+    JUMP -1629
     PRINTC 110
 
     LOAD 2

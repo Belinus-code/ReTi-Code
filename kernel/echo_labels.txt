@@ -22,7 +22,6 @@ ECHO_LOOP:
     STORE 1025
     JUMP CALL
 
-
     LOAD 1030
     STORE 2
     STORE 1030
