@@ -3,6 +3,7 @@
 A small cooperative multitasking kernel for the ReTI, written in ReTI assembly.
 It runs on the classic ReTI (`IN2` is used as stack pointer) and provides processes, a scheduler, a heap
 and message passing.
+Right now, it contains a simple Process that reads every Key-Input with a system call and prints the ascii-Value of the key to the screen. Pressing ESC will shutdown the kernel and all other processes.
 
 ## Run
 
